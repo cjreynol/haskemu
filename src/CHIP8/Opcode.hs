@@ -1,67 +1,24 @@
 {-|
-Module      : Main
-Description : The main program
+Module      : CHIP8.Opcode
+Description : Opcode decoding and execution
 Copyright   : (c) Chad Reynolds, 2018
 License     : MIT
 -}
 
-module Main (
-    main
+module CHIP8.Opcode (
+    handleOpcode
     ) where
 
-import Control.Monad.Primitive          (PrimState)
-import Data.Bits
-import Data.Vector              as V
-import Data.Vector.Mutable      as MV
-import Data.Word                        (Word8, Word16, Word64)
+import Data.Bits            ((.&.), shiftR)
+import Data.Word            (Word16)
+
+import CHIP8.ProgramState   (ProgramState)
 
 
--- | Initialize the program state, load the program into memory, then begin
--- execution loop.
-main :: IO ()
-main = do
-    regs <- makeRegisters
-    MV.write regs 10 0x00
-    MV.write regs 11 0xAA
-    fRegs <- V.freeze regs
-    putStrLn $ w16ToStr (makeWord16 (fRegs V.! 10) (fRegs V.! 11))
-
-w16ToStr :: Word16 -> String
-w16ToStr (0x00AA) = "matched"
-w16ToStr n      = "unmatched" Prelude.++ show n
-
-makeWord16 :: Word8 -> Word8 -> Word16
-makeWord16 w1 w2 = ((fromIntegral w1) `shiftL` 8) .|. (fromIntegral w2)
-
-
-type Registers = IO (MVector (PrimState IO) Word8)
-makeRegisters :: Registers
-makeRegisters = MV.new 16
-
-type Memory = IO (MVector (PrimState IO) Word8)
-makeMemory :: Memory
-makeMemory = MV.new 4096
-
-type Screen = IO (MVector (PrimState IO) Word64)
-makeScreen :: Screen    -- 32 rows of 64 bits
-makeScreen = MV.new 32
-
-data ProgramState = ProgramState {
-      registers         :: Registers
-    , memory            :: Memory
-    , screen            :: Screen
-    -- need some representation for keypresses, maybe MVar so it blocks?
-    , indexPointer      :: Word16
-    , programCounter    :: Word16
-    , stack             :: [Word16]
-    , stackPointer      :: Word16
-    , delayTimer        :: Word16
-    , soundTimer        :: Word16
-    }
-
--- TODO: implement actions 
-decodeOpcodes :: Word16 -> String
-decodeOpcodes code = 
+-- | Decode the opcode according to the CHIP-8 specification and take the 
+-- appropriate action on the ProgramState.
+handleOpcode :: Word16 -> ProgramState -> String
+handleOpcode code pState = 
     case nib1 of 
         0x0000 -> case addr of 
                     0x00E0  -> "clear screen"
@@ -91,6 +48,7 @@ decodeOpcodes code =
                     -- shiftL a bit out of Reb[nib2] and "into Reg[0xF]
                     0x000E -> "Reg[0xF] = Reg[nib2] & 0x7000;\
                                 \ Reg[nib2] = Reg[nib2] `shiftL` 1"
+                    _       -> "Unexpected opcode:  " ++ (show code)
         0x0009 -> "skip if Reg[nib2] != Reg[nib3]"
         0x000A -> "I = addr"
         0x000B -> "PC = addr + Reg[0]" -- jump to addr + Reg[0]
@@ -102,6 +60,7 @@ decodeOpcodes code =
         0x000E -> case low of
                     0x009E -> "skip next if keypress == Reg[nib2]"
                     0x00A1 -> "skip next if keypress != Reg[nib2]"
+                    _       -> "Unexpected opcode:  " ++ (show code)
         0x000F -> case low of
                     0x0007 -> "Reg[nib2] = delayTimer"
                     0x000A -> "Reg[nib2] = next keypress" -- block until
@@ -117,12 +76,13 @@ decodeOpcodes code =
                     0x0055 -> "Mem[I] = [Reg[0], Reg[1], ..., Reg[nib2]]"
                     -- load memory into registers
                     0x0065 -> "[Reg[0], Reg[1], ..., Reg[nib2] = Mem[I]"
-        _ -> "Unexpected opcode."
+                    _       -> "Unexpected opcode:  " ++ (show code)
+        _ -> "Unexpected opcode:  " ++ (show code)
     where 
-        nib1 = shiftR (code .&. 0xF000) 24
-        nib2 = shiftR (code .&. 0x0F00) 16
-        nib3 = shiftR (code .&. 0x00F0) 8
-        nib4 = code .&. 0x000F
-        addr = code .&. 0x0FFF
-        low  = code .&. 0x00FF
+        nib1 = shiftR (code .&. 0xF000) 24  -- first 4 bits of 1st byte
+        nib2 = shiftR (code .&. 0x0F00) 16  -- second 4 bits of 1st byte
+        nib3 = shiftR (code .&. 0x00F0) 8   -- first 4 bits of 2nd byte
+        nib4 = code .&. 0x000F              -- second 4 bits of 2nd byte
+        addr = code .&. 0x0FFF              -- last 12 bits of 2 bytes
+        low  = code .&. 0x00FF              -- 2nd byte
 
