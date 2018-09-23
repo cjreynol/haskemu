@@ -23,7 +23,9 @@ source-repository head
     location:           git://github.com/Cjreynol/haskgb.git
 
 library
-    build-depends:        base     >= 4.11 && < 4.12
+    build-depends:        base      >= 4.11 && < 4.12
+                        , vector    >= 0.12 && < 0.13
+                        , sdl2      >= 2.4  && < 2.5
     -- exposed-modules:
     -- other-modules:
     hs-source-dirs:     src
@@ -37,7 +39,11 @@ library
 
 executable haskgb
     main-is:            Main.hs
-    build-depends:        base     >= 4.11 && < 4.12
+    build-depends:        base      >= 4.11 && < 4.12
+                        , haskgb    >= 0.1
+                        , vector    >= 0.12 && < 0.13
+                        , primitive >= 0.6  && < 0.7
+                        , sdl2      >= 2.4  && < 2.5
     -- other-modules:
     hs-source-dirs:     src
     -- other-extensions:
@@ -46,5 +52,5 @@ executable haskgb
                         -Wcompat 
                         -Wincomplete-uni-patterns 
                         -Wincomplete-record-updates 
-                        -Wmissing-import-lists
+--                        -Wmissing-import-lists
 
