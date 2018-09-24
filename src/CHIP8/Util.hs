@@ -21,7 +21,7 @@ makeWord16 :: Word8 -> Word8 -> Word16
 makeWord16 w1 w2 = ((fromIntegral w1) `shiftL` 8) .|. (fromIntegral w2)
 
 -- | Decrement the value to 0, unless it is already <= 0.
-decrementToZero :: Word16 -> Word16
+decrementToZero :: Word8 -> Word8
 decrementToZero word 
     | word > 0 = word - 1
     | otherwise = 0

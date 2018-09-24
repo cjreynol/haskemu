@@ -8,7 +8,6 @@ License     : MIT
 module CHIP8.ProgramState (
       ProgramState(..)
     , initializeProgram
-    , makeScreen
     ) where
 
 import Data.Vector as V    (Vector, concat, fromList, length, replicate)
@@ -19,19 +18,18 @@ type ProgramData    = Vector Word8
 type Registers      = Vector Word8
 type Memory         = Vector Word8
 type Screen         = Vector Word64
+type KeyState       = Vector Bool
 
 data ProgramState = ProgramState {
       registers         :: Registers
     , memory            :: Memory
-    , screen            :: Screen       -- unsure if needed, depends on draw
+    , screen            :: Screen
     , indexRegister     :: Word16
     , programCounter    :: Word16
     , stack             :: [Word16]
-    , delayTimer        :: Word16
-    , soundTimer        :: Word16
-    -- need some representation for keypresses
-    --      maybe something like MVar so it blocks for me?
-    --      Vector (MVar Bool)?
+    , delayTimer        :: Word8
+    , soundTimer        :: Word8
+    , keyState          :: KeyState
     }
 
 -- | The default start position of the program in memory
@@ -47,6 +45,7 @@ initializeProgram pData = ProgramState  makeRegisters
                                         []
                                         0x0
                                         0x0
+                                        makeKeyState
 
 makeRegisters :: Registers
 makeRegisters = V.replicate 16 0
@@ -82,6 +81,9 @@ fontData = V.fromList
     , 0xF0, 0x80, 0xF0, 0x80, 0xF0  -- E
     , 0xF0, 0x80, 0xF0, 0x80, 0x80  -- F
     ]
+
+makeKeyState :: KeyState
+makeKeyState = V.replicate 16 False
 
 {- 
 keycodes

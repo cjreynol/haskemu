@@ -25,8 +25,9 @@ source-repository head
 executable chip8
     main-is:            CHIP8/Main.hs
     build-depends:        base      >= 4.11 && < 4.12
-                        , vector    >= 0.12 && < 0.13
                         , primitive >= 0.6  && < 0.7
+                        , random    >= 1.1  && < 1.2
+                        , vector    >= 0.12 && < 0.13
                         , sdl2      >= 2.4  && < 2.5
     other-modules:        CHIP8.Opcode
                         , CHIP8.ProgramState
