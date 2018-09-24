@@ -8,6 +8,7 @@ License     : MIT
 module CHIP8.ProgramState (
       ProgramState(..)
     , initializeProgram
+    , makeScreen
     ) where
 
 import Data.Vector as V    (Vector, concat, fromList, length, replicate)
@@ -34,15 +35,15 @@ data ProgramState = ProgramState {
     }
 
 -- | The default start position of the program in memory
-programStart :: Word16
-programStart = 0x200
+programStartAddr :: Word16
+programStartAddr = 0x200
 
 initializeProgram :: ProgramData -> ProgramState
 initializeProgram pData = ProgramState  makeRegisters
                                         (makeMemory pData)
                                         makeScreen
                                         0x0
-                                        programStart
+                                        programStartAddr
                                         []
                                         0x0
                                         0x0
