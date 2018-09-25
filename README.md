@@ -17,8 +17,12 @@ fit these together and operate on them.
 
 ## Building
 
-I use cabal to build my projects, and with the release of the tool and 
-library version 2.4 the new-style commands are in place and expected to be 
-used.  To build the project use `cabal new-build`, `cabal new-run` to 
-run the executable, and `cabal new-haddock` to build the docs.
+This project has been tested with GHC 8.4.3 and cabal-install 2.4.  With the 
+2.4 release of cabal the new-style commands are in place and expected to be 
+used, with the old-style versions deprecated and eventually going to be 
+removed.  
+
+- To build the project:  `cabal new-build chip8`
+- To run(and potentially build):  `cabal new-run chip8`
+- To build the docs:  `cabal new-haddock chip8`
 

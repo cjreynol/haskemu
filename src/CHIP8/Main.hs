@@ -22,7 +22,15 @@ import CHIP8.Util                   (decrementToZero, makeWord16)
 main :: IO ()
 main = do
     let pState = initializeProgram empty
+    mainLoop pState
+
+mainLoop :: ProgramState -> IO ()
+mainLoop pState = do
     _ <- emulateCycle pState
+    --update keyState
+    --detect if quit key was pressed
+    --when (screenUpdated nextState) (draw nextState)
+    --unless ((done nextState) || isQuit) (mainLoop nextState)
     return ()
 
 -- | Step through the execution cycle of a CHIP-8 program.
@@ -33,11 +41,8 @@ emulateCycle pState = do
     opcodeL <- MV.read mem $ fromIntegral (1 + (programCounter pState))
     let opcodeAction = decodeOpcode (makeWord16 opcodeH opcodeL)
     nextState <- opcodeAction pState
-    return $ nextState  { delayTimer = decrementToZero $ 
-                                            delayTimer nextState
-                        , soundTimer = decrementToZero $ 
-                                            soundTimer nextState
-                        , programCounter = 2 + 
-                                            programCounter nextState
+    return $ nextState  { delayTimer = decrementToZero $ delayTimer nextState
+                        , soundTimer = decrementToZero $ soundTimer nextState
+                        , programCounter = 2 + programCounter nextState
                         }
 

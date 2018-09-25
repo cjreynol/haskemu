@@ -11,14 +11,16 @@ module CHIP8.Opcode (
     decodeOpcode
     ) where
 
+import Control.Monad.Primitive      (PrimState)
 import Data.Bits                    ((.&.), (.|.), shiftL, shiftR, xor)
 import Data.Word                    (Word8, Word16)
-import Data.Vector                  ((!), elemIndex, freeze, thaw)
-import Data.Vector.Mutable  as MV   (read, set, write)
+import Data.Vector          as V    ((!), elemIndex, freeze, fromList, slice, 
+                                        thaw, zip)
+import Data.Vector.Mutable  as MV   (MVector, read, set, write)
 
 import System.Random                (getStdRandom, randomR)
 
-import CHIP8.ProgramState           (ProgramState(..))
+import CHIP8.ProgramState           (ProgramState(..), fontDataAddr)
 import CHIP8.Util                   (addCarry, subtractCarry)
 
 
@@ -30,65 +32,53 @@ decodeOpcode code =
         0x0000 -> case addr of 
                     0x00E0  -> clearScreen
                     0x00EE  -> returnFrom
-                    _       -> noOp --"call program at addr"
+                    _       -> noOp -- call program at addr
         0x0001 -> jumpToAddr addr
         0x0002 -> callSubroutine addr
-        0x0003 -> skipIfVal (==) (fromIntegral nib2) (fromIntegral low)
-        0x0004 -> skipIfVal (/=) (fromIntegral nib2) (fromIntegral low)
-        0x0005 -> skipIfReg (==) (fromIntegral nib2) (fromIntegral nib3)
-        0x0006 -> setRegVal (fromIntegral nib2) (fromIntegral low)
-        0x0007 -> addRegVal (fromIntegral nib2) (fromIntegral low)
+        0x0003 -> skipIfVal (==) nib2 low
+        0x0004 -> skipIfVal (/=) nib2 low
+        0x0005 -> skipIfReg (==) nib2 nib3
+        0x0006 -> setRegVal nib2 low
+        0x0007 -> addRegVal nib2 low
         0x0008 -> case nib4 of
-                    0x0000 -> setReg (fromIntegral nib2) (fromIntegral nib3)
-                    0x0001 -> setRegOp (.|.) (fromIntegral nib2) 
-                                                (fromIntegral nib3)
-                    0x0002 -> setRegOp (.&.) (fromIntegral nib2)
-                                                (fromIntegral nib3)
-                    0x0003 -> setRegOp (xor) (fromIntegral nib2)
-                                                (fromIntegral nib3)
-                    0x0004 -> setRegOpCarry addCarry (fromIntegral nib2) 
-                                                        (fromIntegral nib3)
-                    0x0005 -> setRegOpCarry subtractCarry (fromIntegral nib2)
-                                                            (fromIntegral nib3)
-                    0x0006 -> shiftOutReg shiftR 0x01 (fromIntegral nib2)
-                    0x0007 -> setRegOpCarry2 subtractCarry (fromIntegral nib2)
-                                                            (fromIntegral nib2)
-                    0x000E -> shiftOutReg shiftL 0x80 (fromIntegral nib2)
+                    0x0000 -> setReg nib2 nib3
+                    0x0001 -> setRegOp (.|.) nib2 nib3
+                    0x0002 -> setRegOp (.&.) nib2 nib3
+                    0x0003 -> setRegOp (xor) nib2 nib3
+                    0x0004 -> setRegOpCarry addCarry nib2 nib3
+                    0x0005 -> setRegOpCarry subtractCarry nib2 nib3
+                    0x0006 -> shiftOutReg shiftR nib2 0x01
+                    0x0007 -> setRegOpCarry2 subtractCarry nib2 nib2
+                    0x000E -> shiftOutReg shiftL nib2 0x80
                     _       -> error $ "Unexpected opcode:  " ++ (show code)
-        0x0009 -> skipIfReg (/=) (fromIntegral nib2) (fromIntegral nib3)
+        0x0009 -> skipIfReg (/=) nib2 nib3
         0x000A -> setIndex addr
         0x000B -> jumpToAddrReg addr
-        0x000C -> randGen (fromIntegral nib2) (fromIntegral low)
-        0x000D -> drawSprite (fromIntegral nib2) (fromIntegral nib3) 
-                                                    (fromIntegral nib4)
+        0x000C -> randGen nib2 low
+        0x000D -> drawSprite nib2 nib3 nib4
         0x000E -> case low of
-                    0x009E -> skipIfKey (fromIntegral nib2) True
-                    0x00A1 -> skipIfKey (fromIntegral nib2) False
+                    0x009E -> skipIfKey nib2 True
+                    0x00A1 -> skipIfKey nib2 False
                     _       -> error $ "Unexpected opcode:  " ++ (show code)
         0x000F -> case low of
-                    0x0007 -> getDelay (fromIntegral nib2)
-                    0x000A -> getNextKey (fromIntegral nib2)
-                    0x0015 -> setDelay (fromIntegral nib2)
-                    0x0018 -> setSound (fromIntegral nib2)
-                    0x001E -> addToIndex (fromIntegral nib2)
-                    0x0029 -> noOp --"I = spriteLocation Reg[nib2]"
-                    0x0033 -> noOp --"(huns, tens, ones) = BCD(Reg[nib2];\
-                                -- \ Mem[I] = huns;\
-                                -- \ Mem[I+1] = tens;\
-                                -- \ Mem[I+2] = ones"
-                    -- dump registers into memory
-                    0x0055 -> noOp --"Mem[I] = [Reg[0], Reg[1], ..., Reg[nib2]]"
-                    -- load memory into registers
-                    0x0065 -> noOp --"[Reg[0], Reg[1], ..., Reg[nib2] = Mem[I]"
+                    0x0007 -> getDelay nib2
+                    0x000A -> getNextKey nib2
+                    0x0015 -> setDelay nib2
+                    0x0018 -> setSound nib2
+                    0x001E -> addToIndex nib2
+                    0x0029 -> setIndexToFont nib2
+                    0x0033 -> binCD nib2
+                    0x0055 -> dumpFromRegs nib2
+                    0x0065 -> loadFromMem nib2
                     _       -> error $ "Unexpected opcode:  " ++ (show code)
         _ -> error $ "Unexpected opcode:  " ++ (show code)
     where 
-        nib1 = shiftR (code .&. 0xF000) 24  -- first 4 bits of 1st byte
-        nib2 = shiftR (code .&. 0x0F00) 16  -- second 4 bits of 1st byte
-        nib3 = shiftR (code .&. 0x00F0) 8   -- first 4 bits of 2nd byte
-        nib4 = code .&. 0x000F              -- second 4 bits of 2nd byte
-        addr = code .&. 0x0FFF              -- last 12 bits of 2 bytes
-        low  = code .&. 0x00FF              -- 2nd byte
+        nib1 = fromIntegral ((code .&. 0xF000) `shiftR` 24) :: Int
+        nib2 = fromIntegral ((code .&. 0x0F00) `shiftR` 16) :: Int
+        nib3 = fromIntegral ((code .&. 0x00F0) `shiftR` 8) :: Int
+        nib4 = fromIntegral (code .&. 0x000F) :: Int
+        addr = code .&. 0x0FFF
+        low  = fromIntegral (code .&. 0x00FF) :: Word8
 
 -- | Do nothing and return the state unchanged.  Used as a placeholder until 
 -- opcodes are implemented.
@@ -96,8 +86,6 @@ noOp :: ProgramState -> IO ProgramState
 noOp = return
 
 -- | Clear the screen, setting all the bits to 0.
--- ????
--- Want to test a non-thaw version of this function
 clearScreen :: ProgramState -> IO ProgramState
 clearScreen pState = do
     curScreen <- thaw $ screen pState
@@ -147,8 +135,6 @@ skipIfReg op i1 i2 p@ProgramState{..}
     | otherwise = return $ p
 
 -- | Set the register to the given value.
--- ????
--- Want to test a non-thaw version of this function
 setRegVal :: Int -> Word8 -> ProgramState -> IO ProgramState
 setRegVal i val pState = do
     regs <- thaw $ registers pState
@@ -158,8 +144,6 @@ setRegVal i val pState = do
 
 -- | Add the given value to the current value of the register.
 -- Note:  Does not set the carry flag.
--- ????
--- Want to test a non-thaw version of this function
 addRegVal :: Int -> Word8 -> ProgramState -> IO ProgramState
 addRegVal i val pState = do
     regs <- thaw $ registers pState
@@ -250,12 +234,27 @@ randGen i val pState = do
     newRegs <- freeze regs
     return $ pState { registers = newRegs }
 
---"Draw sprite at pos (Reg[nib2], Reg[nib3])\
--- \ with width=8px height=nib4;\
--- \ each row[0-nib4] read 8 bits at a time from Mem[I];\
--- \ Reg[0xF] = 1 if any screen pixel goes from set to unset"
-drawSprite :: Int -> Int -> Word8 -> ProgramState -> IO ProgramState
-drawSprite i1 i2 val = noOp
+-- | Draw a sprite at the screen location indexed by the two given register 
+-- values, it is 8-bits wide and byteNum rows tall.  The sprite is located in 
+-- memory at the address in index register, and consists of the given byteNum 
+-- number of bytes.
+-- Note;  The carry flag is set to 1 if any screen pixel goes from set to 
+-- unset, 0 otherwise.  This is used for collision detection.
+drawSprite :: Int -> Int -> Int -> ProgramState -> IO ProgramState
+drawSprite i1 i2 byteNum p@ProgramState{..} = 
+    let index = fromIntegral indexRegister
+        spriteData = slice index (8 * byteNum) memory
+        x = fromIntegral $ registers ! i1
+        y = fromIntegral $ registers ! i2 in
+    do
+        scr <- thaw screen
+        -- get the data for a row of the sprite
+            -- read one or two bytes of data depending on if the index aligns
+            -- need to figure out the best way to write over two bytes 
+        -- xor with the corresponding spriteData, detect if any 1's were unset
+        -- write the row back in the screen
+        newScreen <- freeze scr
+        return $ p { screen = newScreen }
 
 -- | Skip the next instruction if the key stored in the given register is 
 -- pressed.
@@ -299,4 +298,55 @@ setSound i pState = let val = (registers pState) ! i in
 addToIndex :: Int -> ProgramState -> IO ProgramState
 addToIndex i p@ProgramState{..} = let val = fromIntegral $ registers ! i in
     return p { indexRegister = indexRegister + val }
+
+-- | Set the index register to the memory address of the image data for the 
+-- digit stored in the given register.
+setIndexToFont :: Int -> ProgramState -> IO ProgramState
+setIndexToFont i pState = let   char = fromIntegral $ (registers pState) ! i 
+                                addr = char * 5 + fontDataAddr in
+    return $ pState { indexRegister =  addr }
+
+-- | Store the binary-coded decimal representation of the number in the 
+-- given register in memory where the index register is pointing to.
+binCD :: Int -> ProgramState -> IO ProgramState
+binCD i pState = let    index = fromIntegral $ indexRegister pState
+                        val = (registers pState) ! i 
+                        ones = val `rem` 10
+                        tens = val `div` 10 `rem` 10
+                        huns = val `div` 100 in do
+    mem <- thaw $ memory pState
+    write mem index huns
+    write mem (index + 1) tens
+    write mem (index + 2) ones
+    newMem <- freeze mem
+    return $ pState { memory = newMem }
+
+-- | Dump registers 0 to the given num into memory starting at the address 
+-- in the index register.
+dumpFromRegs :: Int -> ProgramState -> IO ProgramState
+dumpFromRegs n pState = let index = fromIntegral $ indexRegister pState in
+    do
+        mem <- thaw $ memory pState
+        sequence_ $ fmap (helper mem index) 
+                        $ V.zip (fromList [0..n]) (registers pState)
+        newMem <- freeze mem
+        return $ pState { memory = newMem }
+    where
+        helper :: MVector (PrimState IO) Word8 -> Int -> (Int, Word8) -> IO ()
+        helper m index (i, val) = write m (index + i) val
+
+-- | Load data from memory into the registers 0 to the given num starting at 
+-- the address in the index register.
+loadFromMem :: Int -> ProgramState -> IO ProgramState
+loadFromMem n p@ProgramState{..} = 
+    let index = fromIntegral indexRegister
+        memData = V.zip (fromList [0..n]) (slice index n memory) in
+    do
+        regs <- thaw registers
+        sequence_ $ fmap (helper regs) memData
+        newRegs <- freeze regs
+        return $ p { registers = newRegs }
+    where
+        helper :: MVector (PrimState IO) Word8 -> (Int, Word8) -> IO ()
+        helper r (i, val) = write r i val
 

@@ -40,5 +40,5 @@ executable chip8
                         -Wcompat 
                         -Wincomplete-uni-patterns 
                         -Wincomplete-record-updates 
---                        -Wmissing-import-lists
+                        -Wmissing-import-lists
 
