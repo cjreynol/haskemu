@@ -1,4 +1,4 @@
-name:                   haskgb
+name:                   haskemu
 version:                0.1.0.0
 cabal-version:          >= 1.12
 build-type:             Simple
@@ -8,9 +8,10 @@ author:                 Chad Reynolds
 copyright:              (c) 2018 Chad Reynolds
 maintainer:             cjreynol13@aol.com
 stability:              alpha
-homepage:               https://github.com/Cjreynol/haskgb
-bug-reports:            https://github.com/Cjreynol/haskgb/issues
-synopsis:               A Nintendo Gameboy emulator
+homepage:               https://github.com/Cjreynol/haskemu
+bug-reports:            https://github.com/Cjreynol/haskemu/issues
+synopsis:               Project to learn about video game emulation through 
+                        implementation
 -- description:
 
 category:               Game
@@ -20,7 +21,7 @@ extra-source-files:     README.md
 
 source-repository head
     type:               git
-    location:           git://github.com/Cjreynol/haskgb.git
+    location:           git://github.com/Cjreynol/haskemu.git
 
 executable chip8
     main-is:            CHIP8/Main.hs

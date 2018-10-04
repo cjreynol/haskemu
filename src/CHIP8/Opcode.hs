@@ -245,9 +245,16 @@ drawSprite i1 i2 byteNum p@ProgramState{..} =
     let index = fromIntegral indexRegister
         spriteData = slice index (8 * byteNum) memory
         x = fromIntegral $ registers ! i1
-        y = fromIntegral $ registers ! i2 in
+        y = fromIntegral $ registers ! i2
+        screenIndex = (y * 8) + (x `div` 8)
+        b1Index = x `rem` 8 
+        in
     do
         scr <- thaw screen
+        b1 <- MV.read scr screenIndex
+        b2 <- MV.read scr $ screenIndex + 1
+        -- want to start writing at b1Index in b1 and into b4
+
         -- get the data for a row of the sprite
             -- read one or two bytes of data depending on if the index aligns
             -- need to figure out the best way to write over two bytes 

@@ -27,9 +27,12 @@ main = do
 mainLoop :: ProgramState -> IO ()
 mainLoop pState = do
     _ <- emulateCycle pState
-    --update keyState
-    --detect if quit key was pressed
+    -- update keyState
+    -- detect if quit key was pressed
     --when (screenUpdated nextState) (draw nextState)
+    --      sdl2 has a createRGBSurface function I can hopefully use to quickly 
+    --      convert my screen field into visuals
+    -- delay until a 60th of a second has passed
     --unless ((done nextState) || isQuit) (mainLoop nextState)
     return ()
 
