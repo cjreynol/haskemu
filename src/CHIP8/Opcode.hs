@@ -11,7 +11,8 @@ module CHIP8.Opcode (
     decodeOpcode
     ) where
 
-import Control.Monad.Primitive      (PrimState)
+import Control.Monad.Primitive      (RealWorld)
+
 import Data.Bits                    ((.&.), (.|.), shiftL, shiftR, xor)
 import Data.Word                    (Word8, Word16)
 import Data.Vector          as V    ((!), elemIndex, freeze, fromList, slice, 
@@ -21,7 +22,8 @@ import Data.Vector.Mutable  as MV   (MVector, read, set, write)
 import System.Random                (getStdRandom, randomR)
 
 import CHIP8.ProgramState           (ProgramState(..), fontDataAddr)
-import CHIP8.Util                   (addCarry, subtractCarry)
+import CHIP8.Util                   (addCarry, makeWord16, splitWord16, 
+                                        subtractCarry)
 
 
 -- | Decode the opcode according to the CHIP-8 specification and take the 
@@ -94,8 +96,6 @@ clearScreen pState = do
     return $ pState { screen = newScreen }
 
 -- | Return from a subroutine.
--- ???? 
--- Is the address going to be off by 2 bytes, or do programs expect it?
 returnFrom :: ProgramState -> IO ProgramState
 returnFrom p@ProgramState{..} = return $ p  { stack = tail stack
                                             , programCounter = head stack
@@ -108,8 +108,8 @@ jumpToAddr :: Word16 -> ProgramState -> IO ProgramState
 jumpToAddr addr pState = return $ pState { programCounter = addr }
 
 -- | Call the subroutine at the given address.
--- ???? 
--- do I need to modify either of the programCounter addresses?
+-- ????
+-- Is the address going to be off by 2 bytes, or do programs expect it?
 callSubroutine :: Word16 -> ProgramState -> IO ProgramState
 callSubroutine addr p@ProgramState{..} = return $ 
     p   { stack = (programCounter : stack)
@@ -231,7 +231,7 @@ randGen i val pState = do
     regs <- thaw $ registers pState
     randNum <- getStdRandom $ randomR (0x00, 0xFF)
     write regs i $ randNum .&. val
-    newRegs <- freeze regs
+    newRegs <- freeze regs 
     return $ pState { registers = newRegs }
 
 -- | Draw a sprite at the screen location indexed by the two given register 
@@ -241,27 +241,39 @@ randGen i val pState = do
 -- Note;  The carry flag is set to 1 if any screen pixel goes from set to 
 -- unset, 0 otherwise.  This is used for collision detection.
 drawSprite :: Int -> Int -> Int -> ProgramState -> IO ProgramState
-drawSprite i1 i2 byteNum p@ProgramState{..} = 
-    let index = fromIntegral indexRegister
+drawSprite i1 i2 byteNum p@ProgramState{..} = do
+    scr <- thaw screen
+    updates <- sequence $ map (\rowCount -> helper rowCount scr) 
+                                [0..byteNum]
+    let pixelUpdate = if (foldr (.|.) 0 updates) > 0
+                        then 1
+                        else 0
+    regs <- thaw registers
+    write regs 0xF pixelUpdate
+    newRegs <- freeze regs
+    newScreen <- freeze scr
+    return $ p  { screen = newScreen
+                , registers = newRegs
+                }
+    where
+        index = fromIntegral indexRegister
         spriteData = slice index (8 * byteNum) memory
         x = fromIntegral $ registers ! i1
         y = fromIntegral $ registers ! i2
         screenIndex = (y * 8) + (x `div` 8)
-        b1Index = x `rem` 8 
-        in
-    do
-        scr <- thaw screen
-        b1 <- MV.read scr screenIndex
-        b2 <- MV.read scr $ screenIndex + 1
-        -- want to start writing at b1Index in b1 and into b4
-
-        -- get the data for a row of the sprite
-            -- read one or two bytes of data depending on if the index aligns
-            -- need to figure out the best way to write over two bytes 
-        -- xor with the corresponding spriteData, detect if any 1's were unset
-        -- write the row back in the screen
-        newScreen <- freeze scr
-        return $ p { screen = newScreen }
+        b1LShift = 16 - (x `rem` 8)
+        helper :: Int -> MVector RealWorld Word8 -> IO Word16
+        helper i mScreen = do
+            b1 <- MV.read mScreen $ screenIndex + (i * 8)
+            b2 <- MV.read mScreen $ screenIndex + (i * 8) + 1
+            let curWord = makeWord16 b1 b2
+                newData = fromIntegral (spriteData ! i) `shiftL` b1LShift
+                newWord =  curWord `xor` newData
+                updated = curWord .&. newData
+                (b1', b2') = splitWord16 newWord
+            write mScreen screenIndex b1'
+            write mScreen screenIndex b2'
+            return updated
 
 -- | Skip the next instruction if the key stored in the given register is 
 -- pressed.
@@ -354,6 +366,6 @@ loadFromMem n p@ProgramState{..} =
         newRegs <- freeze regs
         return $ p { registers = newRegs }
     where
-        helper :: MVector (PrimState IO) Word8 -> (Int, Word8) -> IO ()
+        helper :: MVector RealWorld Word8 -> (Int, Word8) -> IO ()
         helper r (i, val) = write r i val
 

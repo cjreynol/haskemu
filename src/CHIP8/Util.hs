@@ -9,16 +9,22 @@ module CHIP8.Util (
       addCarry
     , decrementToZero
     , makeWord16
+    , splitWord16
     , subtractCarry
     ) where
 
-import Data.Bits    ((.&.), (.|.), shiftL)
+import Data.Bits    ((.&.), (.|.), shiftL, shiftR)
 import Data.Word    (Word8, Word16)
 
 
 -- | Combine the single bytes into a single 2-byte value.
 makeWord16 :: Word8 -> Word8 -> Word16
 makeWord16 w1 w2 = ((fromIntegral w1) `shiftL` 8) .|. (fromIntegral w2)
+
+-- | Split the 2-bytes into pieces, the most significant bits being the first 
+-- of the pair.
+splitWord16 :: Word16 -> (Word8, Word8)
+splitWord16 w = ((fromIntegral w) `shiftR` 8, fromIntegral w)
 
 -- | Decrement the value to 0, unless it is already <= 0.
 decrementToZero :: Word8 -> Word8
