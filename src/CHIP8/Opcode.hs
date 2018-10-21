@@ -11,13 +11,11 @@ module CHIP8.Opcode (
     decodeOpcode
     ) where
 
-import Control.Monad.Primitive      (RealWorld)
-
 import Data.Bits                    ((.&.), (.|.), shiftL, shiftR, xor)
 import Data.Word                    (Word8, Word16)
 import Data.Vector          as V    ((!), elemIndex, freeze, fromList, slice, 
                                         thaw, zip)
-import Data.Vector.Mutable  as MV   (MVector, read, set, write)
+import Data.Vector.Mutable  as MV   (IOVector, read, set, write)
 
 import System.Random                (getStdRandom, randomR)
 
@@ -90,10 +88,12 @@ noOp = return
 -- | Clear the screen, setting all the bits to 0.
 clearScreen :: ProgramState -> IO ProgramState
 clearScreen pState = do
-    curScreen <- thaw $ screen pState
-    set curScreen 0
-    newScreen <- freeze curScreen
-    return $ pState { screen = newScreen }
+    scr <- thaw $ screen pState
+    set scr 0
+    newScreen <- freeze scr
+    return $ pState { screen = newScreen
+                    , screenModified = True
+                    }
 
 -- | Return from a subroutine.
 returnFrom :: ProgramState -> IO ProgramState
@@ -254,6 +254,7 @@ drawSprite i1 i2 byteNum p@ProgramState{..} = do
     newScreen <- freeze scr
     return $ p  { screen = newScreen
                 , registers = newRegs
+                , screenModified = True
                 }
     where
         index = fromIntegral indexRegister
@@ -262,7 +263,7 @@ drawSprite i1 i2 byteNum p@ProgramState{..} = do
         y = fromIntegral $ registers ! i2
         screenIndex = (y * 8) + (x `div` 8)
         b1LShift = 16 - (x `rem` 8)
-        helper :: Int -> MVector RealWorld Word8 -> IO Word16
+        helper :: Int -> IOVector Word8 -> IO Word16
         helper i mScreen = do
             b1 <- MV.read mScreen $ screenIndex + (i * 8)
             b2 <- MV.read mScreen $ screenIndex + (i * 8) + 1
@@ -351,7 +352,7 @@ dumpFromRegs n pState = let index = fromIntegral $ indexRegister pState in
         newMem <- freeze mem
         return $ pState { memory = newMem }
     where
-        helper :: MVector (PrimState IO) Word8 -> Int -> (Int, Word8) -> IO ()
+        helper :: IOVector Word8 -> Int -> (Int, Word8) -> IO ()
         helper m index (i, val) = write m (index + i) val
 
 -- | Load data from memory into the registers 0 to the given num starting at 
@@ -366,6 +367,6 @@ loadFromMem n p@ProgramState{..} =
         newRegs <- freeze regs
         return $ p { registers = newRegs }
     where
-        helper :: MVector RealWorld Word8 -> (Int, Word8) -> IO ()
+        helper :: IOVector Word8 -> (Int, Word8) -> IO ()
         helper r (i, val) = write r i val
 

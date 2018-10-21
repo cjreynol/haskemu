@@ -54,6 +54,9 @@ data ProgramState = ProgramState {
     -- | The current state of the 16 keys, indexed [0x0-0xF] with True 
     -- indicating the key is pressed and False indicating it is not.
     , keyState          :: KeyState
+    -- | Indicates whether the screen data has changed and needs to be 
+    -- re-drawn to the screen.
+    , screenModified    :: Bool
     }
 
 -- | The default start position of the program in memory.
@@ -76,6 +79,7 @@ initializeProgram pData = ProgramState  makeRegisters
                                         0x0
                                         0x0
                                         makeKeyState
+                                        False
 
 makeRegisters :: Registers
 makeRegisters = V.replicate 16 0
