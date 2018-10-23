@@ -6,25 +6,32 @@ License     : MIT
 -}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module CHIP8.Main (
     main
     ) where
 
+import Control.Monad                (unless)
 import Data.Vector                  (Vector, convert, empty, thaw)
 import Data.Vector.Mutable  as MV   (read)
 import qualified Data.Vector.Storable as SV (Vector, thaw)
 import Data.Word                    (Word8)
 
+import SDL.Init                     (initializeAll, quit)
+import SDL.Event                    (Event, pollEvents)
 import SDL.Vect                     (Point(P), V2(V2), V4(V4))
-import SDL.Video.Renderer           (createRGBSurfaceFrom, getWindowSurface, 
-                                        masksToPixelFormat, present, 
-                                        surfaceBlit, updateWindowSurface)
+import SDL.Video                    (createRenderer, createWindow, 
+                                        defaultWindow, destroyWindow)
+import SDL.Video.Renderer           (createRGBSurfaceFrom, defaultRenderer, 
+                                        getWindowSurface, masksToPixelFormat, 
+                                        present, surfaceBlit, 
+                                        updateWindowSurface)
 
-import CHIP8.DisplayState           (DisplayState(..), cleanUpDisplayState, 
-                                        defaultDisplayState, updateDisplay)
+import CHIP8.DisplayState           (DisplayState(DisplayState, renderer, window))
 import CHIP8.Opcode                 (decodeOpcode)
-import CHIP8.ProgramState           (ProgramState(..), initializeProgram)
+import CHIP8.ProgramState           (ProgramState(..), KeyState, 
+                                        initializeProgram)
 import CHIP8.Util                   (decrementToZero, makeWord16)
 
 
@@ -32,22 +39,25 @@ import CHIP8.Util                   (decrementToZero, makeWord16)
 -- execution loop.
 main :: IO ()
 main = do
+    initializeAll
+    w <- createWindow "CHIP-8 Emulator" defaultWindow
+    r <- createRenderer w (-1) defaultRenderer
     let pState = initializeProgram empty
-    dState <- defaultDisplayState
-    mainLoop pState dState
-    cleanUpDisplayState dState
+    mainLoop pState DisplayState { window = w, renderer = r }
+    destroyWindow w
+    quit
 
 mainLoop :: ProgramState -> DisplayState -> IO ()
 mainLoop pState dState = do
-    nextState <- emulateCycle pState
-    -- update keyState
-    -- detect if quit key was pressed
+    events <- pollEvents
+    let ks' = foldr updateKeyState (keyState pState) events
+        isQuit = True   -- actually check for a quit key like Esc
+    nextState <- emulateCycle pState { keyState = ks' }
     nextState' <- if screenModified pState 
                     then renderScreen nextState dState
                     else return nextState
     -- delay until a 60th of a second has passed
-    --unless (isQuit || done nextState) (mainLoop nextState)
-    return ()
+    unless isQuit (mainLoop nextState' dState)  -- also check if emu is done
 
 -- | Step through the execution cycle of a CHIP-8 program.
 emulateCycle :: ProgramState -> IO ProgramState
@@ -79,4 +89,21 @@ renderScreen pState DisplayState{..} = do
         pitch = 64 * 4
         rgbaMasks = V4 0 0 0 0
         destPos = Just $ P (V2 0 0)
+
+updateKeyState :: Event -> KeyState -> KeyState
+updateKeyState event ks = undefined
+
+{- 
+keycodes
+    Keypad                   Keyboard
+    +-+-+-+-+                +-+-+-+-+
+    |1|2|3|C|                |1|2|3|4|
+    +-+-+-+-+                +-+-+-+-+
+    |4|5|6|D|                |Q|W|E|R|
+    +-+-+-+-+       =>       +-+-+-+-+
+    |7|8|9|E|                |A|S|D|F|
+    +-+-+-+-+                +-+-+-+-+
+    |A|0|B|F|                |Z|X|C|V|
+    +-+-+-+-+                +-+-+-+-+
+-}
 
