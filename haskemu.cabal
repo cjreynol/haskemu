@@ -61,3 +61,17 @@ library chip8-lib
                         -Wincomplete-uni-patterns 
                         -Wincomplete-record-updates 
                         -Wmissing-import-lists
+
+test-suite chip-spec
+    type:               exitcode-stdio-1.0
+    main-is:            Spec.hs
+    build-depends:        base          ^>= 4.16.4
+                        , hspec         >=  2.11.0
+                        , chip8-lib
+    other-modules:        UtilSpec
+    hs-source-dirs:     test/CHIP8
+    --default-extensions:
+    --other-extensions:
+    default-language:   GHC2021
+    ghc-options:        -Wall
+    build-tool-depends: hspec-discover:hspec-discover == 2.*
