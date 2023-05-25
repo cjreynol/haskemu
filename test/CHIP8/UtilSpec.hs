@@ -11,7 +11,7 @@ module UtilSpec (
 
 import Test.Hspec (Spec, describe, it, shouldBe)
 
-import CHIP8.Util (decrementToZero)
+import Util (decrementToZero)
 
 spec :: Spec
 spec = do

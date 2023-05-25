@@ -24,19 +24,18 @@ source-repository head
     location:           git://github.com/Cjreynol/haskemu.git
 
 executable chip8
-    main-is:            CHIP8/Main.hs
+    main-is:            Main.hs
     build-depends:        base      ^>= 4.16.4
                         , vector    ^>= 0.13.0
                         , sdl2      ^>= 2.5.5
                         , chip8-lib
     --other-modules:
-    hs-source-dirs:     haskemu
+    hs-source-dirs:     haskemu/CHIP8
     --default-extensions:
     other-extensions:     OverloadedStrings
                         , RecordWildCards
     default-language:   GHC2021
-    ghc-options:        -main-is CHIP8.Main
-                        -Wall 
+    ghc-options:        -Wall 
                         -Wcompat 
                         -Wincomplete-uni-patterns 
                         -Wincomplete-record-updates 
@@ -47,12 +46,12 @@ library chip8-lib
                         , random    ^>= 1.2.1
                         , vector    ^>= 0.13.0
                         , sdl2      ^>= 2.5.5
-    exposed-modules:      CHIP8.DisplayState
-                        , CHIP8.Opcode
-                        , CHIP8.ProgramState
-                        , CHIP8.Util
+    exposed-modules:      DisplayState
+                        , Opcode
+                        , ProgramState
+                        , Util
     --other-modules:
-    hs-source-dirs:     src
+    hs-source-dirs:     src/CHIP8
     --default-extensions:
     other-extensions:     RecordWildCards
     default-language:   GHC2021
@@ -62,7 +61,7 @@ library chip8-lib
                         -Wincomplete-record-updates 
                         -Wmissing-import-lists
 
-test-suite chip-spec
+test-suite chip8-spec
     type:               exitcode-stdio-1.0
     main-is:            Spec.hs
     build-depends:        base          ^>= 4.16.4

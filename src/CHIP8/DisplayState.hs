@@ -1,12 +1,12 @@
 {-|
-Module      : CHIP8.DisplayState
+Module      : DisplayState
 Description : Holds all of the data needed for the visuals
-Copyright   : (c) Chad Reynolds, 2018
+Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
 
 
-module CHIP8.DisplayState (
+module DisplayState (
       DisplayState(..)
     ) where
 

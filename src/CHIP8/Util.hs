@@ -1,11 +1,11 @@
 {-|
-Module      : CHIP8.Util
+Module      : Util
 Description : Defines some utility functions for dealing with Word datatypes
-Copyright   : (c) Chad Reynolds, 2018
+Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
 
-module CHIP8.Util (
+module Util (
       addCarry
     , decrementToZero
     , makeWord16

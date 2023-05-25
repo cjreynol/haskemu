@@ -1,11 +1,11 @@
 {-|
-Module      : CHIP8.ProgramState
+Module      : ProgramState
 Description : The state of the program including registers, memory, etc
-Copyright   : (c) Chad Reynolds, 2018
+Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
 
-module CHIP8.ProgramState (
+module ProgramState (
       KeyState
     , Memory
     , ProgramData

@@ -1,13 +1,13 @@
 {-|
-Module      : CHIP8.Opcode
+Module      : Opcode
 Description : Opcode decoding and execution
-Copyright   : (c) Chad Reynolds, 2018
+Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
 
 {-# LANGUAGE RecordWildCards #-}
 
-module CHIP8.Opcode (
+module Opcode (
     decodeOpcode
     ) where
 
@@ -19,8 +19,8 @@ import Data.Vector.Mutable  as MV   (IOVector, read, set, write)
 
 import System.Random                (getStdRandom, randomR)
 
-import CHIP8.ProgramState           (ProgramState(..), fontDataAddr)
-import CHIP8.Util                   (addCarry, makeWord16, splitWord16, 
+import ProgramState           (ProgramState(..), fontDataAddr)
+import Util                   (addCarry, makeWord16, splitWord16, 
                                         subtractCarry)
 
 

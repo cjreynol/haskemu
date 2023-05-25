@@ -1,14 +1,14 @@
 {-|
-Module      : CHIP8.Main
+Module      : Main
 Description : The main CHIP-8 program
-Copyright   : (c) Chad Reynolds, 2018
+Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
 
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module CHIP8.Main (
+module Main (
     main
     ) where
 
@@ -28,11 +28,11 @@ import SDL.Video.Renderer           (createRGBSurfaceFrom, defaultRenderer,
                                         present, surfaceBlit, 
                                         updateWindowSurface)
 
-import CHIP8.DisplayState           (DisplayState(DisplayState, renderer, window))
-import CHIP8.Opcode                 (decodeOpcode)
-import CHIP8.ProgramState           (ProgramState(..), KeyState, 
+import DisplayState           (DisplayState(DisplayState, renderer, window))
+import Opcode                 (decodeOpcode)
+import ProgramState           (ProgramState(..), KeyState, 
                                         initializeProgram)
-import CHIP8.Util                   (decrementToZero, makeWord16)
+import Util                   (decrementToZero, makeWord16)
 
 
 -- | Initialize the program state, load the program into memory, then begin
