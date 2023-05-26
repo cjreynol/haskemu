@@ -6,7 +6,6 @@ License     : MIT
 -}
 
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Main (
     main
@@ -21,17 +20,12 @@ import Data.Word                    (Word8)
 import SDL.Init                     (initializeAll, quit)
 import SDL.Event                    (Event, pollEvents)
 import SDL.Vect                     (Point(P), V2(V2), V4(V4))
-import SDL.Video                    (createRenderer, createWindow, 
-                                        defaultWindow, destroyWindow)
-import SDL.Video.Renderer           (createRGBSurfaceFrom, defaultRenderer, 
-                                        getWindowSurface, masksToPixelFormat, 
-                                        present, surfaceBlit, 
-                                        updateWindowSurface)
+import SDL.Video                    (destroyWindow)
+import SDL.Video.Renderer           (createRGBSurfaceFrom, getWindowSurface, masksToPixelFormat, present, surfaceBlit, updateWindowSurface)
 
-import DisplayState           (DisplayState(DisplayState, renderer, window))
+import DisplayState           (DisplayState(DisplayState, renderer, window), createDisplayState)
 import Opcode                 (decodeOpcode)
-import ProgramState           (ProgramState(..), KeyState, 
-                                        initializeProgram)
+import ProgramState           (ProgramState(..), KeyState, initializeProgram)
 import Util                   (decrementToZero, makeWord16)
 
 
@@ -40,11 +34,10 @@ import Util                   (decrementToZero, makeWord16)
 main :: IO ()
 main = do
     initializeAll
-    w <- createWindow "CHIP-8 Emulator" defaultWindow
-    r <- createRenderer w (-1) defaultRenderer
     let pState = initializeProgram empty
-    mainLoop pState DisplayState { window = w, renderer = r }
-    destroyWindow w
+    ds <- createDisplayState
+    mainLoop pState ds
+    destroyWindow $ window ds
     quit
 
 mainLoop :: ProgramState -> DisplayState -> IO ()
@@ -64,7 +57,7 @@ emulateCycle :: ProgramState -> IO ProgramState
 emulateCycle pState = do
     mem <- thaw $ memory pState
     opcodeH <- MV.read mem $ fromIntegral (programCounter pState)
-    opcodeL <- MV.read mem $ fromIntegral (1 + (programCounter pState))
+    opcodeL <- MV.read mem $ fromIntegral (1 + programCounter pState)
     let opcodeAction = decodeOpcode (makeWord16 opcodeH opcodeL)
     nextState <- opcodeAction pState
     return $ nextState  { delayTimer = decrementToZero $ delayTimer nextState
@@ -74,7 +67,7 @@ emulateCycle pState = do
 
 renderScreen :: ProgramState -> DisplayState -> IO ProgramState
 renderScreen pState DisplayState{..} = do
-    scrM <- SV.thaw $ ((convert :: Vector Word8 -> SV.Vector Word8) (screen pState))
+    scrM <- SV.thaw $ (convert :: Vector Word8 -> SV.Vector Word8) (screen pState)
     -- expand each bit to RGBA
     pixFormat <- masksToPixelFormat bitsPerPixel rgbaMasks
     screenSurface <- createRGBSurfaceFrom scrM size pitch pixFormat
