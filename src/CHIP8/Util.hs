@@ -13,18 +13,18 @@ module Util (
     , subtractCarry
     ) where
 
-import Data.Bits    ((.&.), (.|.), shiftL, shiftR)
+import Data.Bits    ((.|.), shiftL, shiftR)
 import Data.Word    (Word8, Word16)
 
-
--- | Combine the single bytes into a single 2-byte value.
-makeWord16 :: Word8 -> Word8 -> Word16
-makeWord16 w1 w2 = ((fromIntegral w1) `shiftL` 8) .|. (fromIntegral w2)
-
--- | Split the 2-bytes into pieces, the most significant bits being the first 
--- of the pair.
-splitWord16 :: Word16 -> (Word8, Word8)
-splitWord16 w = ((fromIntegral w) `shiftR` 8, fromIntegral w)
+-- | Add the two bytes together, also returning a 1 if there was a carry bit 
+-- or 0 otherwise.
+addCarry :: Word8 -> Word8 -> (Word8, Word8)
+addCarry n m 
+    | hasCarry = (n + m, 1)
+    | otherwise = (n + m, 0)
+    where
+        hasCarry :: Bool
+        hasCarry = (n .|. m) == 0xFF && n > 0x00 && m > 0x00
 
 -- | Decrement the value to 0, unless it is already <= 0.
 decrementToZero :: Word8 -> Word8
@@ -32,12 +32,17 @@ decrementToZero word
     | word > 0 = word - 1
     | otherwise = 0
 
--- | Add the two bytes together, also returning a 1 if there was a carry bit 
--- or 0 otherwise.
-addCarry :: Word8 -> Word8 -> (Word8, Word8)
-addCarry n m 
-    | (n .&. m .&. 0x80) == 0x80 = (n + m, 1)
-    | otherwise = (n + m, 0)
+-- | Combine the single bytes into a single 2-byte value.
+makeWord16 :: Word8 -> Word8 -> Word16
+makeWord16 w1 w2 = (fromIntegral w1 `shiftL` 8) .|. fromIntegral w2
+
+-- | Split the 2-bytes into pieces, the most significant bits being the first 
+-- of the pair.
+splitWord16 :: Word16 -> (Word8, Word8)
+splitWord16 w = (fromIntegral topHalf, fromIntegral w)
+    where
+        topHalf :: Word16
+        topHalf = fromIntegral w `shiftR` 8
 
 -- | Subtract the second byte from the first, also returning a 0 if there was 
 -- a borrow or 1 otherwise.
