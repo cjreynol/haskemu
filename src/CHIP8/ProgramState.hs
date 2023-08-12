@@ -55,7 +55,7 @@ data ProgramState = ProgramState {
     -- indicating the key is pressed and False indicating it is not.
     , keyState          :: KeyState
     -- | Indicates whether the screen data has changed and needs to be 
-    -- re-drawn to the screen.
+    -- re-drawn.
     , screenModified    :: Bool
     }
 

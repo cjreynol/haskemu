@@ -16,7 +16,7 @@ module Util (
 import Data.Bits    ((.|.), shiftL, shiftR)
 import Data.Word    (Word8, Word16)
 
--- | Add the two bytes together, also returning a 1 if there was a carry bit 
+-- | Add the two bytes together, also returning a 1 if there is a carry bit 
 -- or 0 otherwise.
 addCarry :: Word8 -> Word8 -> (Word8, Word8)
 addCarry n m 
@@ -24,7 +24,7 @@ addCarry n m
     | otherwise = (n + m, 0)
     where
         hasCarry :: Bool
-        hasCarry = (n .|. m) == 0xFF && n > 0x00 && m > 0x00
+        hasCarry = m > 0 && n > (maxBound - m)
 
 -- | Decrement the value to 0, unless it is already <= 0.
 decrementToZero :: Word8 -> Word8
