@@ -8,7 +8,9 @@ License     : MIT
 {-# LANGUAGE RecordWildCards #-}
 
 module Opcode (
-    decodeOpcode
+    OpcodeComponents(..)
+    , createOpcodeComponents
+    , decodeOpcode
     ) where
 
 import Data.Bits                    ((.&.), (.|.), shiftL, shiftR, xor)
@@ -24,61 +26,76 @@ import Util                   (addCarry, makeWord16, splitWord16,
                                         subtractCarry)
 
 
+-- | The components of the opcode, to be matched on to determine which operation to run
+data OpcodeComponents = OpcodeComponents 
+    { high      :: Word8
+    , low       :: Word8
+    , nibble1   :: Int
+    , nibble2   :: Int
+    , nibble3   :: Int
+    , nibble4   :: Int
+    -- | the last 12 bits of the opcode, a memory address
+    , address   :: Word16
+    } deriving (Eq, Show)
+
+createOpcodeComponents :: Word8 -> Word8 -> OpcodeComponents
+createOpcodeComponents h l = OpcodeComponents h l nib1 nib2 nib3 nib4 addr
+    where
+        nib1 = fromIntegral ((h .&. 0xF0) `shiftR` 4) :: Int
+        nib2 = fromIntegral (h .&. 0x0F) :: Int
+        nib3 = fromIntegral ((l .&. 0xF0) `shiftR` 4) :: Int
+        nib4 = fromIntegral (l .&. 0x0F) :: Int
+        addr = makeWord16 h l .&. 0x0FFF
+
+
 -- | Decode the opcode according to the CHIP-8 specification and take the 
 -- appropriate action on the ProgramState.
-decodeOpcode :: Word16 -> ProgramState -> IO ProgramState
-decodeOpcode code =
-    case nib1 of 
-        0x0000 -> case addr of 
+decodeOpcode :: OpcodeComponents -> ProgramState -> IO ProgramState
+decodeOpcode code@(OpcodeComponents{..}) =
+    case nibble1 of 
+        0x0000 -> case address of 
                     0x00E0  -> clearScreen
                     0x00EE  -> returnFrom
                     _       -> noOp -- call program at addr
-        0x0001 -> jumpToAddr addr
-        0x0002 -> callSubroutine addr
-        0x0003 -> skipIfVal (==) nib2 low
-        0x0004 -> skipIfVal (/=) nib2 low
-        0x0005 -> skipIfReg (==) nib2 nib3
-        0x0006 -> setRegVal nib2 low
-        0x0007 -> addRegVal nib2 low
-        0x0008 -> case nib4 of
-                    0x0000 -> setReg nib2 nib3
-                    0x0001 -> setRegOp (.|.) nib2 nib3
-                    0x0002 -> setRegOp (.&.) nib2 nib3
-                    0x0003 -> setRegOp (xor) nib2 nib3
-                    0x0004 -> setRegOpCarry addCarry nib2 nib3
-                    0x0005 -> setRegOpCarry subtractCarry nib2 nib3
-                    0x0006 -> shiftOutReg shiftR nib2 0x01
-                    0x0007 -> setRegOpCarry2 subtractCarry nib2 nib2
-                    0x000E -> shiftOutReg shiftL nib2 0x80
-                    _       -> error $ "Unexpected opcode:  " ++ (show code)
-        0x0009 -> skipIfReg (/=) nib2 nib3
-        0x000A -> setIndex addr
-        0x000B -> jumpToAddrReg addr
-        0x000C -> randGen nib2 low
-        0x000D -> drawSprite nib2 nib3 nib4
+        0x0001 -> jumpToAddr address
+        0x0002 -> callSubroutine address
+        0x0003 -> skipIfVal (==) nibble2 low
+        0x0004 -> skipIfVal (/=) nibble2 low
+        0x0005 -> skipIfReg (==) nibble2 nibble3
+        0x0006 -> setRegVal nibble2 low
+        0x0007 -> addRegVal nibble2 low
+        0x0008 -> case nibble4 of
+                    0x0000 -> setReg nibble2 nibble3
+                    0x0001 -> setRegOp (.|.) nibble2 nibble3
+                    0x0002 -> setRegOp (.&.) nibble2 nibble3
+                    0x0003 -> setRegOp xor nibble2 nibble3
+                    0x0004 -> setRegOpCarry addCarry nibble2 nibble3
+                    0x0005 -> setRegOpCarry subtractCarry nibble2 nibble3
+                    0x0006 -> shiftOutReg shiftR nibble2 0x01
+                    0x0007 -> setRegOpCarry2 subtractCarry nibble2 nibble2
+                    0x000E -> shiftOutReg shiftL nibble2 0x80
+                    _       -> error $ "Unexpected opcode:  " ++ show code
+        0x0009 -> skipIfReg (/=) nibble2 nibble3
+        0x000A -> setIndex address
+        0x000B -> jumpToAddrReg address
+        0x000C -> randGen nibble2 low
+        0x000D -> drawSprite nibble2 nibble3 nibble4
         0x000E -> case low of
-                    0x009E -> skipIfKey nib2 True
-                    0x00A1 -> skipIfKey nib2 False
-                    _       -> error $ "Unexpected opcode:  " ++ (show code)
+                    0x009E -> skipIfKey nibble2 True
+                    0x00A1 -> skipIfKey nibble2 False
+                    _       -> error $ "Unexpected opcode:  " ++ show code
         0x000F -> case low of
-                    0x0007 -> getDelay nib2
-                    0x000A -> getNextKey nib2
-                    0x0015 -> setDelay nib2
-                    0x0018 -> setSound nib2
-                    0x001E -> addToIndex nib2
-                    0x0029 -> setIndexToFont nib2
-                    0x0033 -> binCD nib2
-                    0x0055 -> dumpFromRegs nib2
-                    0x0065 -> loadFromMem nib2
-                    _       -> error $ "Unexpected opcode:  " ++ (show code)
-        _ -> error $ "Unexpected opcode:  " ++ (show code)
-    where 
-        nib1 = fromIntegral ((code .&. 0xF000) `shiftR` 24) :: Int
-        nib2 = fromIntegral ((code .&. 0x0F00) `shiftR` 16) :: Int
-        nib3 = fromIntegral ((code .&. 0x00F0) `shiftR` 8) :: Int
-        nib4 = fromIntegral (code .&. 0x000F) :: Int
-        addr = code .&. 0x0FFF
-        low  = fromIntegral (code .&. 0x00FF) :: Word8
+                    0x0007 -> getDelay nibble2
+                    0x000A -> getNextKey nibble2
+                    0x0015 -> setDelay nibble2
+                    0x0018 -> setSound nibble2
+                    0x001E -> addToIndex nibble2
+                    0x0029 -> setIndexToFont nibble2
+                    0x0033 -> binCD nibble2
+                    0x0055 -> dumpFromRegs nibble2
+                    0x0065 -> loadFromMem nibble2
+                    _       -> error $ "Unexpected opcode:  " ++ show code
+        _ -> error $ "Unexpected opcode:  " ++ show code
 
 -- | Do nothing and return the state unchanged.  Used as a placeholder until 
 -- opcodes are implemented.
@@ -112,7 +129,7 @@ jumpToAddr addr pState = return $ pState { programCounter = addr }
 -- Is the address going to be off by 2 bytes, or do programs expect it?
 callSubroutine :: Word16 -> ProgramState -> IO ProgramState
 callSubroutine addr p@ProgramState{..} = return $ 
-    p   { stack = (programCounter : stack)
+    p   { stack = programCounter : stack
         , programCounter = addr
         }
 
@@ -245,7 +262,7 @@ drawSprite i1 i2 byteNum p@ProgramState{..} = do
     scr <- thaw screen
     updates <- sequence $ map (\rowCount -> helper rowCount scr) 
                                 [0..byteNum]
-    let pixelUpdate = if (foldr (.|.) 0 updates) > 0
+    let pixelUpdate = if foldr (.|.) 0 updates > 0
                         then 1
                         else 0
     regs <- thaw registers

@@ -24,9 +24,9 @@ import SDL.Video                    (destroyWindow)
 import SDL.Video.Renderer           (createRGBSurfaceFrom, getWindowSurface, masksToPixelFormat, present, surfaceBlit, updateWindowSurface)
 
 import DisplayState           (DisplayState(DisplayState, renderer, window), createDisplayState)
-import Opcode                 (decodeOpcode)
+import Opcode                 (createOpcodeComponents, decodeOpcode)
 import ProgramState           (ProgramState(..), KeyState, initializeProgram)
-import Util                   (decrementToZero, makeWord16)
+import Util                   (decrementToZero)
 
 
 -- | Initialize the program state, load the program into memory, then begin
@@ -58,7 +58,7 @@ emulateCycle pState = do
     mem <- thaw $ memory pState
     opcodeH <- MV.read mem $ fromIntegral (programCounter pState)
     opcodeL <- MV.read mem $ fromIntegral (1 + programCounter pState)
-    let opcodeAction = decodeOpcode (makeWord16 opcodeH opcodeL)
+    let opcodeAction = decodeOpcode (createOpcodeComponents opcodeH opcodeL)
     nextState <- opcodeAction pState
     return $ nextState  { delayTimer = decrementToZero $ delayTimer nextState
                         , soundTimer = decrementToZero $ soundTimer nextState
