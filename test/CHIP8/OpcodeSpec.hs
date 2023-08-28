@@ -1,7 +1,7 @@
 {-|
 Module      : Opcode
 Description : The opcode processing function tests
-Copyright   : (c) Chad Reynolds, 2018-2023
+Copyright   : (c) Chad Reynolds, 2023
 License     : MIT
 -}
 

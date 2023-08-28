@@ -50,4 +50,3 @@ subtractCarry :: Word8 -> Word8 -> (Word8, Word8)
 subtractCarry n m
     | n < m = (n - m, 0)
     | otherwise = (n - m, 1)
-

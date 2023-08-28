@@ -49,6 +49,7 @@ library chip8-lib
     exposed-modules:      DisplayState
                         , Opcode
                         , ProgramState
+                        , Resolver
                         , Util
     --other-modules:
     hs-source-dirs:     src/CHIP8

@@ -118,4 +118,3 @@ fontData = V.fromList
 
 makeKeyState :: KeyState
 makeKeyState = V.replicate 16 False
-
