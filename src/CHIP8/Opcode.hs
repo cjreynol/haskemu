@@ -11,7 +11,7 @@ module Opcode (
     OpcodeComponents(..)
     , createOpcodeComponents
     , decodeOpcode
-    , decodeOpcode'
+    , resolveOpcode
     ) where
 
 import Data.Bits                    ((.&.), (.|.), shiftL, shiftR, xor)
@@ -61,19 +61,24 @@ type NImmediate = Int
 
 -- | Datatype for the resolved opcode and its arguments, to be executed
 data Opcode = 
-    -- * Unused
-    -- | call machine code routine at address
-    CallRoutine Address
+
     -- * Display
     -- | clear the screen
-    | ClearDisplay
+      ClearDisplay
+    -- | draw 8 by N sprite at (X,Y)
+    | Draw Register Register NImmediate
+
     -- * Program flow
     -- | return from a subroutine
     | Return
     -- | jump to address
     | Jump Address
+    -- | jump to address plus value in register 0
+    | JumpAdd Address
     -- | call subroutine at address
     | Subroutine Address
+
+    -- * Conditionals
     -- | skip next instruction if value in register == immediate
     | SkipEq Register Immediate
     -- | skip next instruction if value in register != immediate
@@ -82,12 +87,18 @@ data Opcode =
     | SkipRegEq Register Register
     -- | skip next instruction if values in registers are not equal
     | SkipRegNotEq Register Register
+
+    -- * Assignment operations
     -- | X = NN
     | Assign Register Immediate
     -- | X += NN (carry flag not changed)
     | AddValue Register Immediate
     -- | X = Y
     | AssignReg Register Register
+    -- | X = random() & NN
+    | SetRandom Register Immediate
+
+    -- Bitwise operations
     -- | X |= Y
     | Or Register Register
     -- | X &= Y
@@ -98,46 +109,54 @@ data Opcode =
     | ShiftR1 Register
     -- | X <<= 1
     | ShiftL1 Register
+
+    -- * Arithmetic operations
     -- | X += Y
     | Add Register Register
     -- | X -= Y
     | Subtract Register Register
     -- | X = Y - X
     | SubtractFlip Register Register
-    -- | set address register to address
-    | SetIndex Address
-    -- | jump to address plus value in register 0
-    | JumpAdd Address
-    -- | X = random() & NN
-    | SetRandom Register Immediate
-    -- | draw 8 by N sprite at (X,Y)
-    | Draw Register Register NImmediate
+
+    -- * Key operations
     -- | skip next instruction if key stored in X is pressed
     | SkipKey Register
     -- | skip next instruction if key stored in X is not pressed
     | SkipNotKey Register
-    -- | X = get_delay_timer()
-    | GetTimer Register
     -- | X = get_key()
     | GetKey Register
+    
+    -- * Timer operations
+    -- | X = get_delay_timer()
+    | GetTimer Register
     -- | set_delay_timer(X)
     | SetTimer Register
     -- | set_sound_timer(X)
     | SetSound Register
+
+    -- * Memory operations
+    -- | set address register to address
+    | SetIndex Address
     -- | set address register to X
     | AddIndexReg Register
     -- | set address register to the location of the sprite for character in X
     | SetIndexSprite Register
-    -- | set_binary_coded_decimal(X)
-    | BCD Register
     -- | register dump 0 to X to memory
     | RegDump Register
     -- | register load 0 to X from memory
     | RegLoad Register
+
+    -- * Other
+    -- | set_binary_coded_decimal(X)
+    | BCD Register
+    -- ** Unused
+    -- | call machine code routine at address
+    | CallRoutine Address
   deriving (Show)
 
-decodeOpcode' :: OpcodeComponents -> Opcode
-decodeOpcode' code@(OpcodeComponents{..}) =
+-- | Decode the opcode according to the CHIP-8 specification, gathering arguments for resolving it
+decodeOpcode :: OpcodeComponents -> Opcode
+decodeOpcode code@(OpcodeComponents{..}) =
     case nibble1 of 
         0x0000 -> case address of 
                     0x00E0  -> ClearDisplay
@@ -183,54 +202,43 @@ decodeOpcode' code@(OpcodeComponents{..}) =
                     _       -> error $ "Unexpected opcode:  " ++ show code
         _ -> error $ "Unexpected opcode:  " ++ show code
 
--- | Decode the opcode according to the CHIP-8 specification and take the 
--- appropriate action on the ProgramState.
-decodeOpcode :: OpcodeComponents -> ProgramState -> IO ProgramState
-decodeOpcode code@(OpcodeComponents{..}) =
-    case nibble1 of 
-        0x0000 -> case address of 
-                    0x00E0  -> clearScreen
-                    0x00EE  -> returnFrom
-                    _       -> noOp -- call program at addr
-        0x0001 -> jumpToAddr address
-        0x0002 -> callSubroutine address
-        0x0003 -> skipIfVal (==) nibble2 low
-        0x0004 -> skipIfVal (/=) nibble2 low
-        0x0005 -> skipIfReg (==) nibble2 nibble3
-        0x0006 -> setRegVal nibble2 low
-        0x0007 -> addRegVal nibble2 low
-        0x0008 -> case nibble4 of
-                    0x0000 -> setReg nibble2 nibble3
-                    0x0001 -> setRegOp (.|.) nibble2 nibble3
-                    0x0002 -> setRegOp (.&.) nibble2 nibble3
-                    0x0003 -> setRegOp xor nibble2 nibble3
-                    0x0004 -> setRegOpCarry addCarry nibble2 nibble3
-                    0x0005 -> setRegOpCarry subtractCarry nibble2 nibble3
-                    0x0006 -> shiftOutReg shiftR nibble2 0x01
-                    0x0007 -> setRegOpCarry2 subtractCarry nibble2 nibble2
-                    0x000E -> shiftOutReg shiftL nibble2 0x80
-                    _       -> error $ "Unexpected opcode:  " ++ show code
-        0x0009 -> skipIfReg (/=) nibble2 nibble3
-        0x000A -> setIndex address
-        0x000B -> jumpToAddrReg address
-        0x000C -> randGen nibble2 low
-        0x000D -> drawSprite nibble2 nibble3 nibble4
-        0x000E -> case low of
-                    0x009E -> skipIfKey nibble2 True
-                    0x00A1 -> skipIfKey nibble2 False
-                    _       -> error $ "Unexpected opcode:  " ++ show code
-        0x000F -> case low of
-                    0x0007 -> getDelay nibble2
-                    0x000A -> getNextKey nibble2
-                    0x0015 -> setDelay nibble2
-                    0x0018 -> setSound nibble2
-                    0x001E -> addToIndex nibble2
-                    0x0029 -> setIndexToFont nibble2
-                    0x0033 -> binCD nibble2
-                    0x0055 -> dumpFromRegs nibble2
-                    0x0065 -> loadFromMem nibble2
-                    _       -> error $ "Unexpected opcode:  " ++ show code
-        _ -> error $ "Unexpected opcode:  " ++ show code
+-- | Take the appropriate action on the ProgramState according to the given opcode
+resolveOpcode :: Opcode -> ProgramState -> IO ProgramState
+resolveOpcode ClearDisplay = clearScreen
+resolveOpcode (Draw rX rY n) = drawSprite rX rY n
+resolveOpcode Return = returnFrom
+resolveOpcode (Jump addr) = jumpToAddr addr
+resolveOpcode (JumpAdd addr) = jumpToAddrReg addr
+resolveOpcode (Subroutine addr) = callSubroutine addr
+resolveOpcode (SkipEq r n) = skipIfVal (==) r n
+resolveOpcode (SkipNotEq r n) = skipIfVal (/=) r n
+resolveOpcode (SkipRegEq rX rY) = skipIfReg (==) rX rY
+resolveOpcode (SkipRegNotEq rX rY ) = skipIfReg (/=) rX rY
+resolveOpcode (Assign r n) = setRegVal r n
+resolveOpcode (AddValue r n) = addRegVal r n
+resolveOpcode (AssignReg rX rY) = setReg rX rY
+resolveOpcode (SetRandom r n) = randGen r n
+resolveOpcode (Or rX rY) = setRegOp (.|.) rX rY
+resolveOpcode (And rX rY) = setRegOp (.&.) rX rY
+resolveOpcode (Xor rX rY) = setRegOp xor rX rY
+resolveOpcode (ShiftR1 r) = shiftOutReg shiftR r 0x01
+resolveOpcode (ShiftL1 r) = shiftOutReg shiftL r 0x80
+resolveOpcode (Add rX rY) = setRegOpCarry addCarry rX rY
+resolveOpcode (Subtract rX rY) = setRegOpCarry subtractCarry rX rY
+resolveOpcode (SubtractFlip rX rY) = setRegOpCarry2 subtractCarry rX rY
+resolveOpcode (SkipKey r) = skipIfKey r True
+resolveOpcode (SkipNotKey r) = skipIfKey r False
+resolveOpcode (GetKey r) = getNextKey r
+resolveOpcode (GetTimer r) = getDelay r
+resolveOpcode (SetTimer r) = setDelay r
+resolveOpcode (SetSound r) = setSound r
+resolveOpcode (SetIndex addr) = setIndex addr
+resolveOpcode (AddIndexReg r) = addToIndex r
+resolveOpcode (SetIndexSprite r) = setIndexToFont r
+resolveOpcode (RegDump r) = dumpFromRegs r
+resolveOpcode (RegLoad r) = loadFromMem r
+resolveOpcode (BCD r) = binCD r
+resolveOpcode (CallRoutine _) = noOp
 
 -- | Do nothing and return the state unchanged.  Used as a placeholder until 
 -- opcodes are implemented.
