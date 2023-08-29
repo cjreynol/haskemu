@@ -10,10 +10,10 @@ module Main (
   ) where
 
 import System.Environment     (getArgs)
-import Data.ByteString as BS  (ByteString, readFile, unpack)
-import Data.Word              (Word8, Word16)
+import Data.ByteString as BS  (readFile, unpack)
+import Data.Word              (Word8)
 
-import Opcode                 (Opcode(..), getOpcode)
+import Opcode                 (Opcode, getOpcode)
 
 main :: IO ()
 main = do

@@ -25,7 +25,7 @@ import SDL.Video.Renderer           (createRGBSurfaceFrom, getWindowSurface, mas
 
 import DisplayState           (DisplayState(DisplayState, renderer, window), createDisplayState)
 import Opcode                 (getOpcode)
-import ProgramState           (ProgramState(..), KeyState, initializeProgram)
+import ProgramState           (ProgramState(memory, screen, keyState, delayTimer, soundTimer, programCounter, screenModified), KeyState, initializeProgram)
 import Resolver               (resolveOpcode)
 import Util                   (decrementToZero)
 
@@ -85,7 +85,7 @@ renderScreen pState DisplayState{..} = do
         destPos = Just $ P (V2 0 0)
 
 updateKeyState :: Event -> KeyState -> KeyState
-updateKeyState event ks = undefined
+updateKeyState = undefined
 
 {- 
 keycodes

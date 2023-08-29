@@ -19,8 +19,13 @@ import Data.Vector.Mutable  as MV   (IOVector, read, set, write)
 
 import System.Random                (getStdRandom, randomR)
 
-import Opcode                 (Opcode(..))
-import ProgramState           (ProgramState(..), fontDataAddr)
+import Opcode                 (Opcode(ClearDisplay, Draw, Return, Jump, JumpAdd, Subroutine, SkipEq, SkipNotEq, 
+                                SkipRegEq, SkipRegNotEq, Assign, AddValue, AssignReg, SetRandom, Or, And, Xor, 
+                                ShiftR1, ShiftL1, Add, Subtract, SubtractFlip, SkipKey, SkipNotKey, GetKey, GetTimer, 
+                                SetTimer, SetSound, SetIndex, AddIndexReg, SetIndexSprite, RegDump, RegLoad, BCD, 
+                                CallRoutine))
+import ProgramState           (ProgramState(ProgramState, registers, memory, screen, indexRegister, programCounter, 
+                                stack, delayTimer, soundTimer, keyState, screenModified), fontDataAddr)
 import Util                   (addCarry, makeWord16, splitWord16, 
                                         subtractCarry)
 
@@ -106,7 +111,7 @@ skipIfVal :: (Word8 -> Word8 -> Bool) -> Int -> Word8 -> ProgramState
 skipIfVal op i val p@ProgramState{..} 
     | (registers ! i) `op` val = return $ 
                                     p { programCounter = programCounter + 2 }
-    | otherwise = return $ p
+    | otherwise = return p
 
 -- | Compare the register values using the given function.  Skip the next 
 -- instruction if the function evaluates to True.
@@ -115,7 +120,7 @@ skipIfReg :: (Word8 -> Word8 -> Bool) -> Int -> Int -> ProgramState
 skipIfReg op i1 i2 p@ProgramState{..}
     | (registers ! i1) `op` (registers ! i2) = return $
                                     p { programCounter = programCounter + 2 }
-    | otherwise = return $ p
+    | otherwise = return p
 
 -- | Set the register to the given value.
 setRegVal :: Int -> Word8 -> ProgramState -> IO ProgramState
@@ -139,7 +144,7 @@ addRegVal i val pState = do
 setReg :: Int -> Int -> ProgramState -> IO ProgramState
 setReg i1 i2 pState = do
     regs <- thaw $ registers pState
-    (MV.read regs i2) >>= (write regs i1)
+    MV.read regs i2 >>= write regs i1
     newRegs <- freeze regs
     return $ pState { registers = newRegs }
 
@@ -203,7 +208,7 @@ setIndex addr pState = return $ pState { indexRegister = addr }
 -- | Jump to the address plus register 0.
 jumpToAddrReg :: Word16 -> ProgramState -> IO ProgramState
 jumpToAddrReg addr pState = 
-    let val = fromIntegral $ (registers pState) ! 0 in 
+    let val = fromIntegral $ registers pState ! 0 in 
     jumpToAddr (addr + val) pState
 
 --"Reg[nib2] = rand in [0,255] & low"
@@ -226,8 +231,7 @@ randGen i val pState = do
 drawSprite :: Int -> Int -> Int -> ProgramState -> IO ProgramState
 drawSprite i1 i2 byteNum p@ProgramState{..} = do
     scr <- thaw screen
-    updates <- sequence $ map (\rowCount -> helper rowCount scr) 
-                                [0..byteNum]
+    updates <- mapM (`helper` scr) [0..byteNum]
     let pixelUpdate = if foldr (.|.) 0 updates > 0
                         then 1
                         else 0
@@ -263,7 +267,7 @@ drawSprite i1 i2 byteNum p@ProgramState{..} = do
 -- pressed.
 skipIfKey :: Int -> Bool -> ProgramState -> IO ProgramState
 skipIfKey i target p@ProgramState{..}
-    | keyState ! (fromIntegral (registers ! i)) == target = return $
+    | keyState ! fromIntegral (registers ! i) == target = return $
                                     p { programCounter = programCounter + 2 }
     | otherwise = return p
 
@@ -285,16 +289,16 @@ getNextKey i p@ProgramState{..} =
             write regs i $ fromIntegral keyI
             newRegs <- freeze regs
             return $ p { registers = newRegs }
-        (Nothing) -> return $ p { programCounter = programCounter - 2 }
+        Nothing -> return $ p { programCounter = programCounter - 2 }
 
 -- | Set the delay timer to the value in the given register.
 setDelay :: Int -> ProgramState -> IO ProgramState
-setDelay i pState = let val = (registers pState) ! i in 
+setDelay i pState = let val = registers pState ! i in 
     return pState { delayTimer = val }
 
 -- | Set the sound timer to the value in the given register.
 setSound :: Int -> ProgramState -> IO ProgramState
-setSound i pState = let val = (registers pState) ! i in 
+setSound i pState = let val = registers pState ! i in 
     return pState { soundTimer = val }
 
 -- | Add the value in the given register to the index register.
@@ -305,7 +309,7 @@ addToIndex i p@ProgramState{..} = let val = fromIntegral $ registers ! i in
 -- | Set the index register to the memory address of the image data for the 
 -- digit stored in the given register.
 setIndexToFont :: Int -> ProgramState -> IO ProgramState
-setIndexToFont i pState = let   char = fromIntegral $ (registers pState) ! i 
+setIndexToFont i pState = let   char = fromIntegral $ registers pState ! i 
                                 addr = char * 5 + fontDataAddr in
     return $ pState { indexRegister =  addr }
 
@@ -313,7 +317,7 @@ setIndexToFont i pState = let   char = fromIntegral $ (registers pState) ! i
 -- given register in memory where the index register is pointing to.
 binCD :: Int -> ProgramState -> IO ProgramState
 binCD i pState = let    index = fromIntegral $ indexRegister pState
-                        val = (registers pState) ! i 
+                        val = registers pState ! i 
                         ones = val `rem` 10
                         tens = val `div` 10 `rem` 10
                         huns = val `div` 100 in do
@@ -330,8 +334,7 @@ dumpFromRegs :: Int -> ProgramState -> IO ProgramState
 dumpFromRegs n pState = let index = fromIntegral $ indexRegister pState in
     do
         mem <- thaw $ memory pState
-        sequence_ $ fmap (helper mem index) 
-                        $ V.zip (fromList [0..n]) (registers pState)
+        mapM_ (helper mem index) $ V.zip (fromList [0..n]) (registers pState)
         newMem <- freeze mem
         return $ pState { memory = newMem }
     where
@@ -346,7 +349,7 @@ loadFromMem n p@ProgramState{..} =
         memData = V.zip (fromList [0..n]) (slice index n memory) in
     do
         regs <- thaw registers
-        sequence_ $ fmap (helper regs) memData
+        mapM_ (helper regs) memData
         newRegs <- freeze regs
         return $ p { registers = newRegs }
     where

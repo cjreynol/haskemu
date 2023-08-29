@@ -11,7 +11,7 @@ module OpcodeSpec (
 
 import Test.Hspec (Spec, describe, it, shouldBe)
 
-import Opcode     (OpcodeComponents(..), createOpcodeComponents, decodeOpcode)
+import Opcode     (OpcodeComponents(..), createOpcodeComponents)
 
 spec :: Spec
 spec = do

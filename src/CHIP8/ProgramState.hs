@@ -90,7 +90,7 @@ makeMemory pData = V.concat [ V.replicate 80 0              -- 0x000 to 0x050
                             , V.replicate 352 0             -- 0x0A0 to 0x200
                             , pData                         -- 0x200 to ??
                             , V.replicate 
-                                (4096 - (V.length pData)) 0 -- ?? to 0x1000
+                                (4096 - V.length pData) 0 -- ?? to 0x1000
                             ]
 
 makeScreen :: Screen
