@@ -17,12 +17,7 @@ compared to the NES or Gameboy.
 
 ## Building and Running
 
-This project has been tested with GHC 8.4.3 and cabal-install 2.4.  With the 
-2.4 release of cabal the new-style commands are in place and expected to be 
-used, with the old-style versions deprecated and eventually going to be 
-removed.  
-
-- To build the project:  `cabal new-build chip8`
-- To run:  `cabal new-run chip8`
-- To build the docs:  `cabal new-haddock chip8`
+- To build the project:  `cabal build chip8`
+- To run:  `cabal run chip8`
+- To build the docs:  `cabal haddock chip8`
 
