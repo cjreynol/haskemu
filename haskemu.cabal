@@ -41,6 +41,22 @@ executable chip8
                         -Wincomplete-record-updates 
                         -Wmissing-import-lists
 
+executable chip8-debugger
+    main-is:            Main.hs
+    build-depends:        base       ^>= 4.16.4
+                        , bytestring ^>= 0.11.4
+                        , chip8-lib
+    --other-modules:
+    hs-source-dirs:     haskemu/CHIP8-debugger
+    --default-extensions:
+    --other-extensions:
+    default-language:   GHC2021
+    ghc-options:        -Wall 
+                        -Wcompat 
+                        -Wincomplete-uni-patterns 
+                        -Wincomplete-record-updates 
+                        -Wmissing-import-lists
+
 library chip8-lib
     build-depends:        base      ^>= 4.16.4
                         , random    ^>= 1.2.1

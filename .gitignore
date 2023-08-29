@@ -1,0 +1,9 @@
+*.ch8
+*.code-workspace
+dist
+dist-newstyle
+.vscode
+TODO
+devlog.md
+tasks.json
+
