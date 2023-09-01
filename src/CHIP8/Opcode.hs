@@ -16,6 +16,7 @@ module Opcode
 
 import           Data.Bits ((.&.), shiftR)
 import           Data.Word (Word16, Word8)
+import           Numeric   (showHex)
 
 import           Util      (makeWord16)
 
@@ -30,7 +31,12 @@ data OpcodeComponents
     , nibble4 :: Int
     , address :: Word16 -- ^ the last 12 bits of the opcode, a memory address
     }
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show OpcodeComponents where
+  show OpcodeComponents {..} = "OpcodeComponents {high = 0x" ++ showHex high ", low = 0x"
+    ++ showHex low ", nibble1 = 0x" ++ showHex nibble1 ", nibble2 = 0x" ++ showHex nibble2 ", nibble3 = 0x"
+    ++ showHex nibble3 ", nibble4 = 0x" ++ showHex nibble4 ", address = 0x" ++ showHex address "}"
 
 createOpcodeComponents :: Word8 -> Word8 -> OpcodeComponents
 createOpcodeComponents h l = OpcodeComponents h l nib1 nib2 nib3 nib4 addr
@@ -142,49 +148,49 @@ data Opcode
 -- | Decode the opcode according to the CHIP-8 specification, gathering arguments for resolving it
 decodeOpcode :: OpcodeComponents -> Opcode
 decodeOpcode code@(OpcodeComponents {..}) = case nibble1 of
-  0x0000 -> case address of
-    0x00E0 -> ClearDisplay
-    0x00EE -> Return
-    _      -> CallRoutine address
-  0x0001 -> Jump address
-  0x0002 -> Subroutine address
-  0x0003 -> SkipEq nibble2 low
-  0x0004 -> SkipNotEq nibble2 low
-  0x0005 -> SkipRegEq nibble2 nibble3
-  0x0006 -> Assign nibble2 low
-  0x0007 -> AddValue nibble2 low
-  0x0008 -> case nibble4 of
-    0x0000 -> AssignReg nibble2 nibble3
-    0x0001 -> Or nibble2 nibble3
-    0x0002 -> And nibble2 nibble3
-    0x0003 -> Xor nibble2 nibble3
-    0x0004 -> Add nibble2 nibble3
-    0x0005 -> Subtract nibble2 nibble3
-    0x0006 -> ShiftR1 nibble2
-    0x0007 -> SubtractFlip nibble2 nibble2
-    0x000E -> ShiftL1 nibble2
-    _      -> error $ "Unexpected opcode:  " ++ show code
-  0x0009 -> SkipRegNotEq nibble2 nibble3
-  0x000A -> SetIndex address
-  0x000B -> JumpAdd address
-  0x000C -> SetRandom nibble2 low
-  0x000D -> Draw nibble2 nibble3 nibble4
-  0x000E -> case low of
+  0x0 -> case address of
+    0x0E0 -> ClearDisplay
+    0x0EE -> Return
+    _     -> CallRoutine address
+  0x1 -> Jump address
+  0x2 -> Subroutine address
+  0x3 -> SkipEq nibble2 low
+  0x4 -> SkipNotEq nibble2 low
+  0x5 -> SkipRegEq nibble2 nibble3
+  0x6 -> Assign nibble2 low
+  0x7 -> AddValue nibble2 low
+  0x8 -> case nibble4 of
+    0x0 -> AssignReg nibble2 nibble3
+    0x1 -> Or nibble2 nibble3
+    0x2 -> And nibble2 nibble3
+    0x3 -> Xor nibble2 nibble3
+    0x4 -> Add nibble2 nibble3
+    0x5 -> Subtract nibble2 nibble3
+    0x6 -> ShiftR1 nibble2
+    0x7 -> SubtractFlip nibble2 nibble2
+    0xE -> ShiftL1 nibble2
+    _   -> error $ "Unexpected value in nibble2(0x" ++ showHex nibble2 ")\n" ++ show code
+  0x9 -> SkipRegNotEq nibble2 nibble3
+  0xA -> SetIndex address
+  0xB -> JumpAdd address
+  0xC -> SetRandom nibble2 low
+  0xD -> Draw nibble2 nibble3 nibble4
+  0xE -> case low of
     0x009E -> SkipKey nibble2
     0x00A1 -> SkipNotKey nibble2
-    _      -> error $ "Unexpected opcode:  " ++ show code
-  0x000F -> case low of
-    0x0007 -> GetTimer nibble2
-    0x000A -> GetKey nibble2
-    0x0015 -> SetTimer nibble2
-    0x0018 -> SetSound nibble2
-    0x001E -> AddIndexReg nibble2
-    0x0029 -> SetIndexSprite nibble2
-    0x0033 -> BCD nibble2
-    0x0055 -> RegDump nibble2
-    0x0065 -> RegLoad nibble2
-    _      -> error $ "Unexpected opcode:  " ++ show code
-  _      -> error $ "Unexpected opcode:  " ++ show code
+    _      -> error $ "Unexpected value in low(0x" ++ showHex low ")\n" ++ show code
+  0xF -> case low of
+    0x07 -> GetTimer nibble2
+    0x0A -> GetKey nibble2
+    0x15 -> SetTimer nibble2
+    0x18 -> SetSound nibble2
+    0x1E -> AddIndexReg nibble2
+    0x29 -> SetIndexSprite nibble2
+    0x33 -> BCD nibble2
+    0x55 -> RegDump nibble2
+    0x65 -> RegLoad nibble2
+    _    -> error $ "Unexpected value in low(0x" ++ showHex low ")\n" ++ show code
+  _   -> error $ "Unexpected value in nibble1(0x" ++ showHex nibble1 ")\n" ++ show code
 
 getOpcode :: Word8 -> Word8 -> Opcode
 getOpcode h l = decodeOpcode $ createOpcodeComponents h l

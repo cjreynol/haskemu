@@ -1,4 +1,5 @@
 *.ch8
+*.dump
 *.code-workspace
 dist
 dist-newstyle
