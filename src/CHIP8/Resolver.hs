@@ -13,21 +13,14 @@ module Resolver (
 
 import Data.Bits                    ((.&.), (.|.), shiftL, shiftR, xor)
 import Data.Word                    (Word8, Word16)
-import Data.Vector          as V    ((!), elemIndex, freeze, fromList, slice, 
-                                        thaw, zip)
+import Data.Vector          as V    ((!), elemIndex, freeze, fromList, slice, thaw, zip)
 import Data.Vector.Mutable  as MV   (IOVector, read, set, write)
 
 import System.Random                (getStdRandom, randomR)
 
-import Opcode                 (Opcode(ClearDisplay, Draw, Return, Jump, JumpAdd, Subroutine, SkipEq, SkipNotEq, 
-                                SkipRegEq, SkipRegNotEq, Assign, AddValue, AssignReg, SetRandom, Or, And, Xor, 
-                                ShiftR1, ShiftL1, Add, Subtract, SubtractFlip, SkipKey, SkipNotKey, GetKey, GetTimer, 
-                                SetTimer, SetSound, SetIndex, AddIndexReg, SetIndexSprite, RegDump, RegLoad, BCD, 
-                                CallRoutine))
-import ProgramState           (ProgramState(ProgramState, registers, memory, screen, indexRegister, programCounter, 
-                                stack, delayTimer, soundTimer, keyState, screenModified), fontDataAddr)
-import Util                   (addCarry, makeWord16, splitWord16, 
-                                        subtractCarry)
+import Opcode                 (Opcode(ClearDisplay, Draw, Return, Jump, JumpAdd, Subroutine, SkipEq, SkipNotEq, SkipRegEq, SkipRegNotEq, Assign, AddValue, AssignReg, SetRandom, Or, And, Xor, ShiftR1, ShiftL1, Add, Subtract, SubtractFlip, SkipKey, SkipNotKey, GetKey, GetTimer, SetTimer, SetSound, SetIndex, AddIndexReg, SetIndexSprite, RegDump, RegLoad, BCD, CallRoutine))
+import ProgramState           (ProgramState(ProgramState, registers, memory, screen, indexRegister, programCounter, stack, delayTimer, soundTimer, keyState, screenModified), fontDataAddr)
+import Util                   (addCarry, makeWord16, splitWord16, subtractCarry)
 
 
 -- | Take the appropriate action on the ProgramState according to the given opcode
@@ -106,8 +99,7 @@ callSubroutine addr p@ProgramState{..} = return $
 
 -- | Compare the register to the given immediate value using the given 
 -- function.  Skip the next instruction if the function evaluates to True.
-skipIfVal :: (Word8 -> Word8 -> Bool) -> Int -> Word8 -> ProgramState 
-                -> IO ProgramState
+skipIfVal :: (Word8 -> Word8 -> Bool) -> Int -> Word8 -> ProgramState -> IO ProgramState
 skipIfVal op i val p@ProgramState{..} 
     | (registers ! i) `op` val = return $ 
                                     p { programCounter = programCounter + 2 }
@@ -115,8 +107,7 @@ skipIfVal op i val p@ProgramState{..}
 
 -- | Compare the register values using the given function.  Skip the next 
 -- instruction if the function evaluates to True.
-skipIfReg :: (Word8 -> Word8 -> Bool) -> Int -> Int -> ProgramState
-                -> IO ProgramState
+skipIfReg :: (Word8 -> Word8 -> Bool) -> Int -> Int -> ProgramState -> IO ProgramState
 skipIfReg op i1 i2 p@ProgramState{..}
     | (registers ! i1) `op` (registers ! i2) = return $
                                     p { programCounter = programCounter + 2 }
@@ -150,8 +141,7 @@ setReg i1 i2 pState = do
 
 -- | Set the first register to the value of the function with the value of 
 -- both registers as arguments.
-setRegOp :: (Word8 -> Word8 -> Word8) -> Int -> Int -> ProgramState
-                -> IO ProgramState
+setRegOp :: (Word8 -> Word8 -> Word8) -> Int -> Int -> ProgramState -> IO ProgramState
 setRegOp op i1 i2 pState = do
     regs <- thaw $ registers pState
     r1Val <- MV.read regs i1
@@ -163,8 +153,7 @@ setRegOp op i1 i2 pState = do
 -- | Set the first register to the value of the function with the value of 
 -- both of the registers as arguments.  Also, set the carry flag based on the 
 -- secondary result of the function.
-setRegOpCarry :: (Word8 -> Word8 -> (Word8, Word8)) -> Int -> Int
-                    -> ProgramState -> IO ProgramState
+setRegOpCarry :: (Word8 -> Word8 -> (Word8, Word8)) -> Int -> Int -> ProgramState -> IO ProgramState
 setRegOpCarry op i1 i2 pState = do
     regs <- thaw $ registers pState
     r1Val <- MV.read regs i1
@@ -176,8 +165,7 @@ setRegOpCarry op i1 i2 pState = do
     return $ pState { registers = newRegs }
 
 -- | The same as setRegOpCarry except the order of the parameters is reversed.
-setRegOpCarry2 :: (Word8 -> Word8 -> (Word8, Word8)) -> Int -> Int
-                    -> ProgramState -> IO ProgramState
+setRegOpCarry2 :: (Word8 -> Word8 -> (Word8, Word8)) -> Int -> Int -> ProgramState -> IO ProgramState
 setRegOpCarry2 op i1 i2 pState = do
     regs <- thaw $ registers pState
     r1Val <- MV.read regs i1
@@ -190,8 +178,7 @@ setRegOpCarry2 op i1 i2 pState = do
     
 -- | Shift the given register using the given function, and put that bit into 
 -- the carry register.
-shiftOutReg :: (Word8 -> Int -> Word8) -> Int -> Word8 -> ProgramState
-                    -> IO ProgramState
+shiftOutReg :: (Word8 -> Int -> Word8) -> Int -> Word8 -> ProgramState -> IO ProgramState
 shiftOutReg op i andVal pState = do
     regs <- thaw $ registers pState
     val <- MV.read regs i
