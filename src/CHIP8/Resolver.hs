@@ -74,7 +74,7 @@ resolveOpcode (CallRoutine _) = noOp
 -- | Do nothing and return the state unchanged.  Used as a placeholder until 
 -- opcodes are implemented.
 noOp :: ProgramState -> IO ProgramState
-noOp = return
+noOp = pure
 
 -- | Clear the screen, setting all the bits to 0.
 clearScreen :: ProgramState -> IO ProgramState
@@ -82,13 +82,13 @@ clearScreen pState = do
   scr <- thaw $ screen pState
   set scr 0
   newScreen <- freeze scr
-  return $ pState { screen         = newScreen
-                  , screenModified = True
-                  }
+  pure $ pState { screen         = newScreen
+                , screenModified = True
+                }
 
 -- | Return from a subroutine.
 returnFrom :: ProgramState -> IO ProgramState
-returnFrom p@ProgramState {..} = return $ p
+returnFrom p@ProgramState {..} = pure $ p
   { stack          = tail stack
   , programCounter = head stack
   }
@@ -97,14 +97,14 @@ returnFrom p@ProgramState {..} = return $ p
 -- ????
 -- Is the address going to be off by 2 bytes, or do programs expect it?
 jumpToAddr :: Word16 -> ProgramState -> IO ProgramState
-jumpToAddr addr pState = return $ pState { programCounter = addr
-                                         }
+jumpToAddr addr pState = pure $ pState { programCounter = addr
+                                       }
 
 -- | Call the subroutine at the given address.
 -- ????
 -- Is the address going to be off by 2 bytes, or do programs expect it?
 callSubroutine :: Word16 -> ProgramState -> IO ProgramState
-callSubroutine addr p@ProgramState {..} = return $ p
+callSubroutine addr p@ProgramState {..} = pure $ p
   { stack          = programCounter : stack
   , programCounter = addr
   }
@@ -113,17 +113,17 @@ callSubroutine addr p@ProgramState {..} = return $ p
 -- function.  Skip the next instruction if the function evaluates to True.
 skipIfVal :: (Word8 -> Word8 -> Bool) -> Int -> Word8 -> ProgramState -> IO ProgramState
 skipIfVal op i val p@ProgramState {..}
-  | (registers ! i) `op` val = return $ p { programCounter = programCounter + 2
-                                          }
-  | otherwise = return p
+  | (registers ! i) `op` val = pure $ p { programCounter = programCounter + 2
+                                        }
+  | otherwise = pure p
 
 -- | Compare the register values using the given function.  Skip the next 
 -- instruction if the function evaluates to True.
 skipIfReg :: (Word8 -> Word8 -> Bool) -> Int -> Int -> ProgramState -> IO ProgramState
 skipIfReg op i1 i2 p@ProgramState {..}
-  | (registers ! i1) `op` (registers ! i2) = return $ p { programCounter = programCounter + 2
-                                                        }
-  | otherwise = return p
+  | (registers ! i1) `op` (registers ! i2) = pure $ p { programCounter = programCounter + 2
+                                                      }
+  | otherwise = pure p
 
 -- | Set the register to the given value.
 setRegVal :: Int -> Word8 -> ProgramState -> IO ProgramState
@@ -131,8 +131,8 @@ setRegVal i val pState = do
   regs <- thaw $ registers pState
   write regs i val
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Add the given value to the current value of the register.
 -- Note:  Does not set the carry flag.
@@ -142,8 +142,8 @@ addRegVal i val pState = do
   curVal <- MV.read regs i
   write regs i $ curVal + val
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Set the first register to the value of the second.
 setReg :: Int -> Int -> ProgramState -> IO ProgramState
@@ -151,8 +151,8 @@ setReg i1 i2 pState = do
   regs <- thaw $ registers pState
   MV.read regs i2 >>= write regs i1
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Set the first register to the value of the function with the value of 
 -- both registers as arguments.
@@ -163,8 +163,8 @@ setRegOp op i1 i2 pState = do
   r2Val <- MV.read regs i2
   write regs i1 $ r1Val `op` r2Val
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Set the first register to the value of the function with the value of 
 -- both of the registers as arguments.  Also, set the carry flag based on the 
@@ -178,8 +178,8 @@ setRegOpCarry op i1 i2 pState = do
   write regs i1 result
   write regs 0xF carry
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | The same as setRegOpCarry except the order of the parameters is reversed.
 setRegOpCarry2 :: (Word8 -> Word8 -> (Word8, Word8)) -> Int -> Int -> ProgramState -> IO ProgramState
@@ -191,8 +191,8 @@ setRegOpCarry2 op i1 i2 pState = do
   write regs i1 result
   write regs 0xF carry
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Shift the given register using the given function, and put that bit into 
 -- the carry register.
@@ -203,13 +203,13 @@ shiftOutReg op i andVal pState = do
   write regs 0xF $ val .&. andVal
   write regs i $ val `op` 1
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Set the index register to the given address.
 setIndex :: Word16 -> ProgramState -> IO ProgramState
-setIndex addr pState = return $ pState { indexRegister = addr
-                                       }
+setIndex addr pState = pure $ pState { indexRegister = addr
+                                     }
 
 -- | Jump to the address plus register 0.
 jumpToAddrReg :: Word16 -> ProgramState -> IO ProgramState
@@ -224,8 +224,8 @@ randGen i val pState = do
   randNum <- getStdRandom $ randomR (0x00, 0xFF)
   write regs i $ randNum .&. val
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Draw a sprite at the screen location indexed by the two given register 
 -- values, it is 8-bits wide and byteNum rows tall.  The sprite is located in 
@@ -242,10 +242,10 @@ drawSprite i1 i2 byteNum p@ProgramState {..} = do
   write regs 0xF pixelUpdate
   newRegs <- freeze regs
   newScreen <- freeze scr
-  return $ p { screen         = newScreen
-             , registers      = newRegs
-             , screenModified = True
-             }
+  pure $ p { screen         = newScreen
+           , registers      = newRegs
+           , screenModified = True
+           }
   where
     index = fromIntegral indexRegister
     spriteData = slice index (8 * byteNum) memory
@@ -264,16 +264,16 @@ drawSprite i1 i2 byteNum p@ProgramState {..} = do
           (b1', b2') = splitWord16 newWord
       write mScreen screenIndex b1'
       write mScreen screenIndex b2'
-      return updated
+      pure updated
 
 -- | Skip the next instruction if the key stored in the given register is 
 -- pressed.
 skipIfKey :: Int -> Bool -> ProgramState -> IO ProgramState
 skipIfKey i target p@ProgramState {..}
-  | keyState ! fromIntegral (registers ! i) == target = return $ p
+  | keyState ! fromIntegral (registers ! i) == target = pure $ p
     { programCounter = programCounter + 2
     }
-  | otherwise = return p
+  | otherwise = pure p
 
 -- | Set the given register to the value in the delay timer.
 getDelay :: Int -> ProgramState -> IO ProgramState
@@ -281,8 +281,8 @@ getDelay i pState = do
   regs <- thaw $ registers pState
   write regs i $ delayTimer pState
   newRegs <- freeze regs
-  return $ pState { registers = newRegs
-                  }
+  pure $ pState { registers = newRegs
+                }
 
 -- | Block the program execution until a key is pressed, then set the given 
 -- register to the value of that key.
@@ -292,26 +292,26 @@ getNextKey i p@ProgramState {..} = case elemIndex True keyState of
     regs <- thaw registers
     write regs i $ fromIntegral keyI
     newRegs <- freeze regs
-    return $ p { registers = newRegs
-               }
-  Nothing     -> return $ p { programCounter = programCounter - 2
-                            }
+    pure $ p { registers = newRegs
+             }
+  Nothing     -> pure $ p { programCounter = programCounter - 2
+                          }
 
 -- | Set the delay timer to the value in the given register.
 setDelay :: Int -> ProgramState -> IO ProgramState
-setDelay i pState = let val = registers pState ! i in return pState
+setDelay i pState = let val = registers pState ! i in pure pState
   { delayTimer = val
   }
 
 -- | Set the sound timer to the value in the given register.
 setSound :: Int -> ProgramState -> IO ProgramState
-setSound i pState = let val = registers pState ! i in return pState
+setSound i pState = let val = registers pState ! i in pure pState
   { soundTimer = val
   }
 
 -- | Add the value in the given register to the index register.
 addToIndex :: Int -> ProgramState -> IO ProgramState
-addToIndex i p@ProgramState {..} = let val = fromIntegral $ registers ! i in return p
+addToIndex i p@ProgramState {..} = let val = fromIntegral $ registers ! i in pure p
   { indexRegister = indexRegister + val
   }
 
@@ -319,7 +319,7 @@ addToIndex i p@ProgramState {..} = let val = fromIntegral $ registers ! i in ret
 -- digit stored in the given register.
 setIndexToFont :: Int -> ProgramState -> IO ProgramState
 setIndexToFont i pState = let char = fromIntegral $ registers pState ! i
-                              addr = char * 5 + fontDataAddr in return $ pState
+                              addr = char * 5 + fontDataAddr in pure $ pState
   { indexRegister = addr
   }
 
@@ -336,8 +336,8 @@ binCD i pState = let index = fromIntegral $ indexRegister pState
   write mem (index + 1) tens
   write mem (index + 2) ones
   newMem <- freeze mem
-  return $ pState { memory = newMem
-                  }
+  pure $ pState { memory = newMem
+                }
 
 -- | Dump registers 0 to the given num into memory starting at the address 
 -- in the index register.
@@ -346,8 +346,8 @@ dumpFromRegs n pState = let index = fromIntegral $ indexRegister pState in do
   mem <- thaw $ memory pState
   mapM_ (helper mem index) $ V.zip (fromList [0 .. n]) (registers pState)
   newMem <- freeze mem
-  return $ pState { memory = newMem
-                  }
+  pure $ pState { memory = newMem
+                }
   where
     helper :: IOVector Word8 -> Int -> (Int, Word8) -> IO ()
     helper m index (i, val) = write m (index + i) val
@@ -360,8 +360,8 @@ loadFromMem n p@ProgramState {..} = let index   = fromIntegral indexRegister
   regs <- thaw registers
   mapM_ (helper regs) memData
   newRegs <- freeze regs
-  return $ p { registers = newRegs
-             }
+  pure $ p { registers = newRegs
+           }
   where
     helper :: IOVector Word8 -> (Int, Word8) -> IO ()
     helper r (i, val) = write r i val
