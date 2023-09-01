@@ -13,6 +13,7 @@ module ProgramState
   , ProgramState(..)
   , fontDataAddr
   , initializeProgram
+  , makeScreen
   ) where
 
 import           Data.Vector as V (Vector, concat, fromList, length, replicate)
