@@ -12,7 +12,7 @@ import           System.Environment (getArgs)
 import           Data.ByteString    as BS (readFile, unpack)
 import           Data.Word          (Word8)
 
-import           Opcode             (Opcode, getOpcode)
+import           Opcode             (getOpcode)
 
 main :: IO ()
 main = do
@@ -20,7 +20,9 @@ main = do
   (commandStr, filePath) <- verifyArgs args
   let command = parseCommand commandStr
   programData <- BS.readFile filePath
-  runCommand command $ BS.unpack programData
+  let opcodeData = pairOff (BS.unpack programData) 0x0
+  print $ uncurry getOpcode $ head opcodeData
+  runCommand command opcodeData
 
 data Command = Disassemble
   deriving (Show)
@@ -33,10 +35,14 @@ parseCommand :: String -> Command
 parseCommand "disassemble" = Disassemble
 parseCommand x = error $ "invalid command " ++ x
 
-runCommand :: Command -> [ Word8 ] -> IO ()
-runCommand Disassemble d = print $ disassemble d
+-- | Pair every two elements together.  Uneven sequences pad with the given default value.
+pairOff :: [ a ] -> a -> [ (a, a) ]
+pairOff (x : y : xs) pad = (x, y) : pairOff xs pad
+pairOff (x : xs) pad = (x, pad) : pairOff xs pad
+pairOff [] _ = []
 
-disassemble :: [ Word8 ] -> [ Opcode ]
-disassemble (x : y : xs) = getOpcode x y : disassemble xs
-disassemble [] = []
-disassemble _ = error "Uneven number of bytes in program"
+-- | Determines opcodes for instructions.
+--  Its use is limited because it has no semantic understanding of programs.
+--  Limited to usages on known program data.
+runCommand :: Command -> [ (Word8, Word8) ] -> IO ()
+runCommand Disassemble d = print $ map (uncurry getOpcode) d
