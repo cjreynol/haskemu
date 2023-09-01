@@ -4,14 +4,13 @@ Description : The opcode processing function tests
 Copyright   : (c) Chad Reynolds, 2023
 License     : MIT
 -}
+module OpcodeSpec
+  ( spec
+  ) where
 
-module OpcodeSpec (
-  spec
-) where
+import           Test.Hspec (Spec, describe, it, shouldBe)
 
-import Test.Hspec (Spec, describe, it, shouldBe)
-
-import Opcode     (OpcodeComponents(..), createOpcodeComponents)
+import           Opcode     (OpcodeComponents(..), createOpcodeComponents)
 
 spec :: Spec
 spec = do

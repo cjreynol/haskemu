@@ -4,14 +4,13 @@ Description : The utility function tests
 Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
+module UtilSpec
+  ( spec
+  ) where
 
-module UtilSpec (
-  spec
-) where
+import           Test.Hspec (Spec, describe, it, shouldBe)
 
-import Test.Hspec (Spec, describe, it, shouldBe)
-
-import Util (addCarry, decrementToZero, makeWord16, splitWord16, subtractCarry)
+import           Util       (addCarry, decrementToZero, makeWord16, splitWord16, subtractCarry)
 
 spec :: Spec
 spec = do

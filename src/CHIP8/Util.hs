@@ -4,33 +4,32 @@ Description : Defines some utility functions for dealing with Word datatypes
 Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
+module Util
+  ( addCarry
+  , decrementToZero
+  , makeWord16
+  , splitWord16
+  , subtractCarry
+  ) where
 
-module Util (
-      addCarry
-    , decrementToZero
-    , makeWord16
-    , splitWord16
-    , subtractCarry
-    ) where
-
-import Data.Bits    ((.|.), shiftL, shiftR)
-import Data.Word    (Word8, Word16)
+import           Data.Bits ((.|.), shiftL, shiftR)
+import           Data.Word (Word16, Word8)
 
 -- | Add the two bytes together, also returning a 1 if there is a carry bit 
 -- or 0 otherwise.
 addCarry :: Word8 -> Word8 -> (Word8, Word8)
-addCarry n m 
-    | hasCarry = (n + m, 1)
-    | otherwise = (n + m, 0)
-    where
-        hasCarry :: Bool
-        hasCarry = m > 0 && n > (maxBound - m)
+addCarry n m
+  | hasCarry = (n + m, 1)
+  | otherwise = (n + m, 0)
+  where
+    hasCarry :: Bool
+    hasCarry = m > 0 && n > (maxBound - m)
 
 -- | Decrement the value to 0, unless it is already <= 0.
 decrementToZero :: Word8 -> Word8
-decrementToZero word 
-    | word > 0 = word - 1
-    | otherwise = 0
+decrementToZero word
+  | word > 0 = word - 1
+  | otherwise = 0
 
 -- | Combine the single bytes into a single 2-byte value.
 makeWord16 :: Word8 -> Word8 -> Word16
@@ -40,13 +39,13 @@ makeWord16 w1 w2 = (fromIntegral w1 `shiftL` 8) .|. fromIntegral w2
 -- of the pair.
 splitWord16 :: Word16 -> (Word8, Word8)
 splitWord16 w = (fromIntegral topHalf, fromIntegral w)
-    where
-        topHalf :: Word16
-        topHalf = fromIntegral w `shiftR` 8
+  where
+    topHalf :: Word16
+    topHalf = fromIntegral w `shiftR` 8
 
 -- | Subtract the second byte from the first, also returning a 0 if there was 
 -- a borrow or 1 otherwise.
 subtractCarry :: Word8 -> Word8 -> (Word8, Word8)
 subtractCarry n m
-    | n < m = (n - m, 0)
-    | otherwise = (n - m, 1)
+  | n < m = (n - m, 0)
+  | otherwise = (n - m, 1)
