@@ -27,10 +27,24 @@ import           Opcode
   )
 import           ProgramState
   ( ProgramState(ProgramState, registers, memory, screen,
-             indexRegister, programCounter, stack, delayTimer, soundTimer,
-             keyState, screenModified)
-  , fontDataAddr
-  , makeScreen
+             indexRegister, programCounter, delayTimer, keyState,
+             screenModified)
+  , addToIndex
+  , callSubroutine
+  , clearScreen
+  , returnFromSubroutine
+  , setDelay
+  , setIndex
+  , setIndexToFont
+  , setProgramCounter
+  , setProgramCounterPlusReg
+  , setSound
+  , skipIfEq
+  , skipIfKey
+  , skipIfNotEq
+  , skipIfNotKey
+  , skipIfRegEq
+  , skipIfRegNotEq
   )
 import           Util                (addCarry, makeWord16, splitWord16, subtractCarry)
 
@@ -38,14 +52,14 @@ import           Util                (addCarry, makeWord16, splitWord16, subtrac
 resolveOpcode :: Opcode -> ProgramState -> IO ProgramState
 resolveOpcode ClearDisplay = pure . clearScreen
 resolveOpcode (Draw rX rY n) = drawSprite rX rY n
-resolveOpcode Return = pure . returnFrom
-resolveOpcode (Jump addr) = pure . jumpToAddr addr
-resolveOpcode (JumpAdd addr) = pure . jumpToAddrReg addr
+resolveOpcode Return = pure . returnFromSubroutine
+resolveOpcode (Jump addr) = pure . setProgramCounter addr
+resolveOpcode (JumpAdd addr) = pure . setProgramCounterPlusReg addr
 resolveOpcode (Subroutine addr) = pure . callSubroutine addr
-resolveOpcode (SkipEq r n) = pure . skipIfVal (==) r n
-resolveOpcode (SkipNotEq r n) = pure . skipIfVal (/=) r n
-resolveOpcode (SkipRegEq rX rY) = pure . skipIfReg (==) rX rY
-resolveOpcode (SkipRegNotEq rX rY) = pure . skipIfReg (/=) rX rY
+resolveOpcode (SkipEq r n) = pure . skipIfEq r n
+resolveOpcode (SkipNotEq r n) = pure . skipIfNotEq r n
+resolveOpcode (SkipRegEq rX rY) = pure . skipIfRegEq rX rY
+resolveOpcode (SkipRegNotEq rX rY) = pure . skipIfRegNotEq rX rY
 resolveOpcode (Assign r n) = setRegVal r n
 resolveOpcode (AddValue r n) = addRegVal r n
 resolveOpcode (AssignReg rX rY) = setReg rX rY
@@ -58,8 +72,8 @@ resolveOpcode (ShiftL1 r) = shiftOutReg shiftL r 0x80
 resolveOpcode (Add rX rY) = setRegOpCarry addCarry rX rY
 resolveOpcode (Subtract rX rY) = setRegOpCarry subtractCarry rX rY
 resolveOpcode (SubtractFlip rX rY) = setRegOpCarry2 subtractCarry rX rY
-resolveOpcode (SkipKey r) = pure . skipIfKey r True
-resolveOpcode (SkipNotKey r) = pure . skipIfKey r False
+resolveOpcode (SkipKey r) = pure . skipIfKey r
+resolveOpcode (SkipNotKey r) = pure . skipIfNotKey r
 resolveOpcode (GetKey r) = getNextKey r
 resolveOpcode (GetTimer r) = getDelay r
 resolveOpcode (SetTimer r) = pure . setDelay r
@@ -70,55 +84,7 @@ resolveOpcode (SetIndexSprite r) = pure . setIndexToFont r
 resolveOpcode (RegDump r) = dumpFromRegs r
 resolveOpcode (RegLoad r) = loadFromMem r
 resolveOpcode (BCD r) = binCD r
-resolveOpcode (CallRoutine _) = pure . noOp
-
--- | Do nothing and return the state unchanged.
-noOp :: ProgramState -> ProgramState
-noOp = id
-
--- | Clear the screen, setting all the bits to 0.
-clearScreen :: ProgramState -> ProgramState
-clearScreen pState = pState { screen         = makeScreen
-                            , screenModified = True
-                            }
-
--- | Return from a subroutine.
-returnFrom :: ProgramState -> ProgramState
-returnFrom p@ProgramState {..} = p { stack          = tail stack
-                                   , programCounter = head stack
-                                   }
-
--- | Jump to the given address.
--- ????
--- Is the address going to be off by 2 bytes, or do programs expect it?
-jumpToAddr :: Word16 -> ProgramState -> ProgramState
-jumpToAddr addr pState = pState { programCounter = addr
-                                }
-
--- | Call the subroutine at the given address.
--- ????
--- Is the address going to be off by 2 bytes, or do programs expect it?
-callSubroutine :: Word16 -> ProgramState -> ProgramState
-callSubroutine addr p@ProgramState {..} = p
-  { stack          = programCounter : stack
-  , programCounter = addr
-  }
-
--- | Compare the register to the given immediate value using the given 
--- function.  Skip the next instruction if the function evaluates to True.
-skipIfVal :: (Word8 -> Word8 -> Bool) -> Int -> Word8 -> ProgramState -> ProgramState
-skipIfVal op i val p@ProgramState {..}
-  | (registers ! i) `op` val = p { programCounter = programCounter + 2
-                                 }
-  | otherwise = p
-
--- | Compare the register values using the given function.  Skip the next 
--- instruction if the function evaluates to True.
-skipIfReg :: (Word8 -> Word8 -> Bool) -> Int -> Int -> ProgramState -> ProgramState
-skipIfReg op i1 i2 p@ProgramState {..}
-  | (registers ! i1) `op` (registers ! i2) = p { programCounter = programCounter + 2
-                                               }
-  | otherwise = p
+resolveOpcode (CallRoutine _) = pure
 
 -- | Set the register to the given value.
 setRegVal :: Int -> Word8 -> ProgramState -> IO ProgramState
@@ -200,15 +166,6 @@ shiftOutReg op i andVal pState = do
   pure $ pState { registers = newRegs
                 }
 
--- | Set the index register to the given address.
-setIndex :: Word16 -> ProgramState -> ProgramState
-setIndex addr pState = pState { indexRegister = addr
-                              }
-
--- | Jump to the address plus register 0.
-jumpToAddrReg :: Word16 -> ProgramState -> ProgramState
-jumpToAddrReg addr pState = let val = fromIntegral $ registers pState ! 0 in jumpToAddr (addr + val) pState
-
 --"Reg[nib2] = rand in [0,255] & low"
 -- | Set the given register to a random number [0, 255] ANDed with the given 
 -- value.
@@ -260,15 +217,6 @@ drawSprite i1 i2 byteNum p@ProgramState {..} = do
       write mScreen screenIndex b2'
       pure updated
 
--- | Skip the next instruction if the key stored in the given register is 
--- pressed.
-skipIfKey :: Int -> Bool -> ProgramState -> ProgramState
-skipIfKey i target p@ProgramState {..}
-  | keyState ! fromIntegral (registers ! i) == target = p
-    { programCounter = programCounter + 2
-    }
-  | otherwise = p
-
 -- | Set the given register to the value in the delay timer.
 getDelay :: Int -> ProgramState -> IO ProgramState
 getDelay i pState = do
@@ -290,32 +238,6 @@ getNextKey i p@ProgramState {..} = case elemIndex True keyState of
              }
   Nothing     -> pure $ p { programCounter = programCounter - 2
                           }
-
--- | Set the delay timer to the value in the given register.
-setDelay :: Int -> ProgramState -> ProgramState
-setDelay i pState = let val = registers pState ! i in pState
-  { delayTimer = val
-  }
-
--- | Set the sound timer to the value in the given register.
-setSound :: Int -> ProgramState -> ProgramState
-setSound i pState = let val = registers pState ! i in pState
-  { soundTimer = val
-  }
-
--- | Add the value in the given register to the index register.
-addToIndex :: Int -> ProgramState -> ProgramState
-addToIndex i p@ProgramState {..} = let val = fromIntegral $ registers ! i in p
-  { indexRegister = indexRegister + val
-  }
-
--- | Set the index register to the memory address of the image data for the 
--- digit stored in the given register.
-setIndexToFont :: Int -> ProgramState -> ProgramState
-setIndexToFont i pState = let char = fromIntegral $ registers pState ! i
-                              addr = char * 5 + fontDataAddr in pState
-  { indexRegister = addr
-  }
 
 -- | Store the binary-coded decimal representation of the number in the 
 -- given register in memory where the index register is pointing to.

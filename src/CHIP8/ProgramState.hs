@@ -4,6 +4,8 @@ Description : The state of the program including registers, memory, etc
 Copyright   : (c) Chad Reynolds, 2018-2023
 License     : MIT
 -}
+{-# LANGUAGE RecordWildCards #-}
+
 module ProgramState
   ( KeyState
   , Memory
@@ -11,12 +13,26 @@ module ProgramState
   , Registers
   , Screen
   , ProgramState(..)
-  , fontDataAddr
+  , addToIndex
+  , callSubroutine
+  , clearScreen
   , initializeProgram
-  , makeScreen
+  , returnFromSubroutine
+  , setDelay
+  , setIndex
+  , setIndexToFont
+  , setProgramCounter
+  , setProgramCounterPlusReg
+  , setSound
+  , skipIfEq
+  , skipIfKey
+  , skipIfNotKey
+  , skipIfNotEq
+  , skipIfRegEq
+  , skipIfRegNotEq
   ) where
 
-import           Data.Vector as V (Vector, concat, fromList, length, replicate)
+import           Data.Vector as V ((!), Vector, concat, fromList, length, replicate)
 import           Data.Word   (Word16, Word8)
 
 type ProgramData = Vector Word8
@@ -115,3 +131,93 @@ fontData = V.fromList
 
 makeKeyState :: KeyState
 makeKeyState = V.replicate 16 False
+
+-- | Clear the screen, setting all the bits to 0.
+clearScreen :: ProgramState -> ProgramState
+clearScreen pState = pState { screen         = makeScreen
+                            , screenModified = True
+                            }
+
+-- | Call the subroutine at the given address.
+callSubroutine :: Word16 -> ProgramState -> ProgramState
+callSubroutine addr p@ProgramState {..} = p
+  { stack          = programCounter : stack
+  , programCounter = addr
+  }
+
+-- | Return from a subroutine.
+returnFromSubroutine :: ProgramState -> ProgramState
+returnFromSubroutine p@ProgramState {..} = p
+  { stack          = tail stack
+  , programCounter = head stack
+  }
+
+-- | Jump to the given address.
+setProgramCounter :: Word16 -> ProgramState -> ProgramState
+setProgramCounter addr pState = pState { programCounter = addr
+                                       }
+
+-- | Jump to the address plus register 0.
+setProgramCounterPlusReg :: Word16 -> ProgramState -> ProgramState
+setProgramCounterPlusReg addr pState = let val = fromIntegral $ registers pState ! 0 in setProgramCounter
+  (addr + val) pState
+
+-- | Set the index register to the given address.
+setIndex :: Word16 -> ProgramState -> ProgramState
+setIndex addr pState = pState { indexRegister = addr
+                              }
+
+-- | Add the value in the given register to the index register.
+addToIndex :: Int -> ProgramState -> ProgramState
+addToIndex i p@ProgramState {..} = let val = fromIntegral $ registers ! i in p
+  { indexRegister = indexRegister + val
+  }
+
+-- | Set the index register to the memory address of the image data for the 
+-- digit stored in the given register.
+setIndexToFont :: Int -> ProgramState -> ProgramState
+setIndexToFont i pState = let char = fromIntegral $ registers pState ! i
+                              addr = char * 5 + fontDataAddr in pState
+  { indexRegister = addr
+  }
+
+-- | Set the delay timer to the value in the given register.
+setDelay :: Int -> ProgramState -> ProgramState
+setDelay i pState = let val = registers pState ! i in pState
+  { delayTimer = val
+  }
+
+-- | Set the sound timer to the value in the given register.
+setSound :: Int -> ProgramState -> ProgramState
+setSound i pState = let val = registers pState ! i in pState
+  { soundTimer = val
+  }
+
+-- | Skip the next instruction based on the condition.
+skipInstruction :: Bool -> ProgramState -> ProgramState
+skipInstruction True p@ProgramState {..} = p { programCounter = programCounter + 2 }
+skipInstruction False p = p
+
+-- | Skip the next instruction if the value in the register is equal to the immediate value
+skipIfEq :: Int -> Word8 -> ProgramState -> ProgramState
+skipIfEq i val p@ProgramState {..} = skipInstruction ((registers ! i) == val) p
+
+-- | Skip the next instruction if the value in the register is not equal to the immediate value
+skipIfNotEq :: Int -> Word8 -> ProgramState -> ProgramState
+skipIfNotEq i val p@ProgramState {..} = skipInstruction ((registers ! i) /= val) p
+
+-- | Skip the next instruction if the value in the register is equal to the value in the other register
+skipIfRegEq :: Int -> Int -> ProgramState -> ProgramState
+skipIfRegEq i1 i2 p@ProgramState {..} = skipInstruction ((registers ! i1) == (registers ! i2)) p
+
+-- | Skip the next instruction if the value in the register is not equal to the value in the other register
+skipIfRegNotEq :: Int -> Int -> ProgramState -> ProgramState
+skipIfRegNotEq i1 i2 p@ProgramState {..} = skipInstruction ((registers ! i1) /= (registers ! i2)) p
+
+-- | Skip the next instruction if the key value in the register is pressed
+skipIfKey :: Int -> ProgramState -> ProgramState
+skipIfKey i p@ProgramState {..} = skipInstruction (keyState ! fromIntegral (registers ! i)) p
+
+-- | Skip the next instruction if the key value in the register is not pressed
+skipIfNotKey :: Int -> ProgramState -> ProgramState
+skipIfNotKey i p@ProgramState {..} = skipInstruction (not (keyState ! fromIntegral (registers ! i))) p
