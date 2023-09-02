@@ -17,6 +17,9 @@ module ProgramState
   , callSubroutine
   , clearScreen
   , initializeProgram
+  , modifyMemory
+  , modifyRegisters
+  , modifyScreen
   , returnFromSubroutine
   , setDelay
   , setIndex
@@ -32,8 +35,9 @@ module ProgramState
   , skipIfRegNotEq
   ) where
 
-import           Data.Vector as V ((!), Vector, concat, fromList, length, replicate)
-import           Data.Word   (Word16, Word8)
+import           Control.Monad.ST (ST)
+import           Data.Vector      as V ((!), MVector, Vector, concat, fromList, length, modify, replicate)
+import           Data.Word        (Word16, Word8)
 
 type ProgramData = Vector Word8
 
@@ -195,7 +199,8 @@ setSound i pState = let val = registers pState ! i in pState
 
 -- | Skip the next instruction based on the condition.
 skipInstruction :: Bool -> ProgramState -> ProgramState
-skipInstruction True p@ProgramState {..} = p { programCounter = programCounter + 2 }
+skipInstruction True p@ProgramState {..} = p { programCounter = programCounter + 2
+                                             }
 skipInstruction False p = p
 
 -- | Skip the next instruction if the value in the register is equal to the immediate value
@@ -221,3 +226,15 @@ skipIfKey i p@ProgramState {..} = skipInstruction (keyState ! fromIntegral (regi
 -- | Skip the next instruction if the key value in the register is not pressed
 skipIfNotKey :: Int -> ProgramState -> ProgramState
 skipIfNotKey i p@ProgramState {..} = skipInstruction (not (keyState ! fromIntegral (registers ! i))) p
+
+modifyRegisters :: (forall s . MVector s Word8 -> ST s ()) -> ProgramState -> ProgramState
+modifyRegisters f p@ProgramState {..} = p { registers = V.modify f registers
+                                          }
+
+modifyMemory :: (forall s . MVector s Word8 -> ST s ()) -> ProgramState -> ProgramState
+modifyMemory f p@ProgramState {..} = p { memory = V.modify f memory
+                                          }
+
+modifyScreen :: (forall s . MVector s Word8 -> ST s ()) -> ProgramState -> ProgramState
+modifyScreen f p@ProgramState {..} = p { screen = V.modify f screen
+                                          }

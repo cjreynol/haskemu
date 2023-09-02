@@ -58,7 +58,7 @@ mainLoop pState dState = do
       isQuit = True   -- actually check for a quit key like Esc
   nextState <- emulateCycle pState { keyState = ks'
                                    }
-  nextState' <- if screenModified pState then renderScreen nextState dState else return nextState
+  nextState' <- if screenModified pState then renderScreen nextState dState else pure nextState
   -- delay until a 60th of a second has passed
   unless isQuit (mainLoop nextState' dState)  -- also check if emu is done
 
@@ -69,11 +69,11 @@ emulateCycle pState = do
   opcodeH <- MV.read mem $ fromIntegral (programCounter pState)
   opcodeL <- MV.read mem $ fromIntegral (1 + programCounter pState)
   let opcodeAction = resolveOpcode $ getOpcode opcodeH opcodeL
-  nextState <- opcodeAction pState
-  return $ nextState { delayTimer     = decrementToZero $ delayTimer nextState
-                     , soundTimer     = decrementToZero $ soundTimer nextState
-                     , programCounter = 2 + programCounter nextState
-                     }
+      nextState    = opcodeAction pState
+  pure $ nextState { delayTimer     = decrementToZero $ delayTimer nextState
+                   , soundTimer     = decrementToZero $ soundTimer nextState
+                   , programCounter = 2 + programCounter nextState
+                   }
 
 renderScreen :: ProgramState -> DisplayState -> IO ProgramState
 renderScreen pState DisplayState {..} = do
@@ -85,8 +85,8 @@ renderScreen pState DisplayState {..} = do
   _ <- surfaceBlit screenSurface Nothing winSurface destPos
   updateWindowSurface window
   present renderer
-  return pState { screenModified = False
-                }
+  pure pState { screenModified = False
+              }
   where
     size         = V2 64 32
     bitsPerPixel = 8 * 4
